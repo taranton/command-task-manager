@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { FiX, FiCalendar, FiUser, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend } from 'react-icons/fi';
+import { FiX, FiCalendar, FiUser, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRight } from 'react-icons/fi';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
@@ -27,6 +27,39 @@ const InlinePanel = styled.div`
   height: 100%;
   background: ${theme.colors.white};
   border-left: 1px solid ${theme.colors.border};
+  display: flex;
+  flex-direction: row;
+  overflow: visible;
+  position: relative;
+`;
+
+const CollapseBtn = styled.button`
+  position: absolute;
+  left: -14px;
+  top: 16px;
+  width: 28px;
+  height: 28px;
+  border-radius: ${theme.borderRadius.round};
+  background: ${theme.colors.white};
+  border: 1px solid ${theme.colors.border};
+  color: ${theme.colors.cadetGray};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  z-index: 10;
+  transition: ${theme.transitions.default};
+
+  &:hover {
+    background: ${theme.colors.lightGray};
+    color: ${theme.colors.charcoal};
+  }
+
+  svg { width: 14px; height: 14px; }
+`;
+
+const InlinePanelContent = styled.div`
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -290,15 +323,17 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
     createSubtask.mutate(newSubtaskTitle.trim());
   };
 
-  const panelContent = (
+  const panelContent = (showClose: boolean) => (
     <>
       <PanelHeader>
         <span style={{ fontSize: theme.typography.fontSize.sm, color: theme.colors.cadetGray }}>
           Task Details
         </span>
-        <CloseButton onClick={onClose}>
-          <FiX />
-        </CloseButton>
+        {showClose && (
+          <CloseButton onClick={onClose}>
+            <FiX />
+          </CloseButton>
+        )}
       </PanelHeader>
 
       <PanelBody>
@@ -472,13 +507,20 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
 
   // Inline mode: side panel without overlay, sits beside the board
   if (inline && !isMobile) {
-    return <InlinePanel>{panelContent}</InlinePanel>;
+    return (
+      <InlinePanel>
+        <CollapseBtn onClick={onClose} title="Collapse panel">
+          <FiChevronsRight />
+        </CollapseBtn>
+        <InlinePanelContent>{panelContent(false)}</InlinePanelContent>
+      </InlinePanel>
+    );
   }
 
   // Mobile / non-inline: full-screen overlay
   return (
     <Overlay onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <OverlayPanel>{panelContent}</OverlayPanel>
+      <OverlayPanel>{panelContent(true)}</OverlayPanel>
     </Overlay>
   );
 }

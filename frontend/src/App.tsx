@@ -27,7 +27,6 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/board" replace />} />
                 <Route path="/board" element={<BoardPage />} />
                 <Route path="/my-tasks" element={<BoardPage />} />
-                <Route path="/stories" element={<div>Stories (coming soon)</div>} />
                 <Route path="/admin" element={<AdminPage />} />
               </Routes>
             </AppShell>

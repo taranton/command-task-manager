@@ -4,7 +4,9 @@ import { FiPlus, FiFilter, FiX, FiChevronDown } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { KanbanBoard } from '../../components/board/KanbanBoard';
+import { BacklogTable } from '../../components/board/BacklogTable';
 import { CreateTaskModal } from '../../components/forms/CreateTask';
+import { CreateStoryModal } from '../../components/forms/CreateStory';
 import { Avatar } from '../../components/ui/Avatar';
 import {
   useBoardData,
@@ -12,6 +14,7 @@ import {
   useUpdateTaskStatus,
   useUpdateTaskPosition,
   useCreateTask,
+  useCreateStory,
 } from '../../hooks/useBoardData';
 import { useUsers, useTeams } from '../../hooks/useUsers';
 import { useAuth } from '../../hooks/useAuth';
@@ -140,8 +143,10 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function BoardPage() {
   const isMobile = useIsMobile();
   const { user: me } = useAuth();
+  const [viewMode, setViewMode] = useState<'kanban' | 'backlog'>('kanban');
   const [filter, setFilter] = useState<BoardFilter>({});
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showCreateStory, setShowCreateStory] = useState(false);
   const [openDrop, setOpenDrop] = useState<string | null>(null);
 
   const { data: board, isLoading, error } = useBoardData(filter);
@@ -152,6 +157,7 @@ export default function BoardPage() {
 
   const updateStatus = useUpdateTaskStatus();
   const updatePosition = useUpdateTaskPosition();
+  const createStory = useCreateStory();
   const firstStory = stories[0];
   const createTask = useCreateTask(filter.story_id || firstStory?.id || '');
 
@@ -182,14 +188,19 @@ export default function BoardPage() {
         <HeaderLeft>
           <PageTitle>Board</PageTitle>
           <ViewSwitcher>
-            <ViewBtn $active>Kanban</ViewBtn>
-            <ViewBtn $active={false}>Timeline</ViewBtn>
+            <ViewBtn $active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')}>Kanban</ViewBtn>
+            <ViewBtn $active={viewMode === 'backlog'} onClick={() => setViewMode('backlog')}>Backlog</ViewBtn>
           </ViewSwitcher>
         </HeaderLeft>
         {!isMobile && (
-          <AddBtn onClick={() => setShowCreateTask(true)}>
-            <FiPlus /> New Task
-          </AddBtn>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <AddBtn onClick={() => setShowCreateStory(true)} style={{ background: '#7C3AED' }}>
+              <FiPlus /> New Story
+            </AddBtn>
+            <AddBtn onClick={() => setShowCreateTask(true)}>
+              <FiPlus /> New Task
+            </AddBtn>
+          </div>
         )}
       </Header>
 
@@ -303,8 +314,13 @@ export default function BoardPage() {
       {/* ---- Board ---- */}
       {isLoading || !board ? (
         <CenterMsg>Loading board...</CenterMsg>
+      ) : viewMode === 'kanban' ? (
+        <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
       ) : (
-        <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} />
+        <BacklogTable
+          stories={stories}
+          allTasks={board.columns.flatMap((c) => c.tasks)}
+        />
       )}
 
       {isMobile && <Fab onClick={() => setShowCreateTask(true)}><FiPlus /></Fab>}
@@ -325,6 +341,18 @@ export default function BoardPage() {
             });
           }}
           isLoading={createTask.isPending}
+        />
+      )}
+
+      {showCreateStory && (
+        <CreateStoryModal
+          onClose={() => setShowCreateStory(false)}
+          onSubmit={(input) => {
+            createStory.mutate(input, {
+              onSuccess: () => setShowCreateStory(false),
+            });
+          }}
+          isLoading={createStory.isPending}
         />
       )}
     </Container>

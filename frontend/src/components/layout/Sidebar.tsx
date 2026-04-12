@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FiCheckSquare, FiColumns, FiBookOpen, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiCheckSquare, FiColumns, FiSettings, FiLogOut } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -86,7 +86,6 @@ const BottomSection = styled.div`
 const navItems = [
   { path: '/my-tasks', icon: FiCheckSquare, label: 'My Tasks' },
   { path: '/board', icon: FiColumns, label: 'Board' },
-  { path: '/stories', icon: FiBookOpen, label: 'Stories' },
 ];
 
 interface SidebarProps {

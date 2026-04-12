@@ -4,6 +4,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { FiPlus } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { SortableTaskCard } from './TaskCard';
 import type { Task, TaskStatus } from '../../types';
@@ -12,7 +13,7 @@ import { TASK_STATUS_LABELS } from '../../types';
 const Column = styled.div<{ $isOver: boolean }>`
   min-width: ${theme.layout.kanbanColumnWidth};
   max-width: ${theme.layout.kanbanColumnWidth};
-  background: ${(p) => (p.$isOver ? theme.colors.statusLight.in_progress : theme.colors.background)};
+  background: ${(p) => (p.$isOver ? '#FFF8F0' : theme.colors.background)};
   border-radius: ${theme.borderRadius.lg};
   padding: ${theme.spacing.sm};
   display: flex;
@@ -59,15 +60,10 @@ const CardList = styled.div`
   flex-direction: column;
   gap: ${theme.spacing.sm};
   padding: 2px;
-  min-height: 60px;
+  min-height: 40px;
 
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: ${theme.colors.silver};
-    border-radius: 2px;
-  }
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: ${theme.colors.silver}; border-radius: 2px; }
 `;
 
 const EmptyState = styled.div`
@@ -79,13 +75,35 @@ const EmptyState = styled.div`
   font-size: ${theme.typography.fontSize.sm};
 `;
 
+const QuickAddBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px ${theme.spacing.sm};
+  margin-top: ${theme.spacing.sm};
+  color: ${theme.colors.cadetGray};
+  font-size: ${theme.typography.fontSize.sm};
+  background: none;
+  border-radius: ${theme.borderRadius.md};
+  transition: ${theme.transitions.default};
+  flex-shrink: 0;
+
+  &:hover {
+    background: ${theme.colors.white};
+    color: ${theme.colors.charcoal};
+  }
+
+  svg { width: 14px; height: 14px; }
+`;
+
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  onQuickAdd?: (status: TaskStatus) => void;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const color = theme.colors.status[status] || theme.colors.cadetGray;
 
@@ -115,6 +133,12 @@ export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) 
           )}
         </CardList>
       </SortableContext>
+
+      {onQuickAdd && (
+        <QuickAddBtn onClick={() => onQuickAdd(status)}>
+          <FiPlus /> Add task
+        </QuickAddBtn>
+      )}
     </Column>
   );
 }

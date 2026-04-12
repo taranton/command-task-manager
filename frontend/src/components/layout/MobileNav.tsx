@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FiCheckSquare, FiColumns, FiBookOpen, FiMoreHorizontal } from 'react-icons/fi';
+import { FiCheckSquare, FiColumns, FiMoreHorizontal } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 
 const NavBar = styled.nav`
@@ -42,7 +42,6 @@ const NavTab = styled.button<{ $active: boolean }>`
 const tabs = [
   { path: '/my-tasks', icon: FiCheckSquare, label: 'Tasks' },
   { path: '/board', icon: FiColumns, label: 'Board' },
-  { path: '/stories', icon: FiBookOpen, label: 'Stories' },
   { path: '/more', icon: FiMoreHorizontal, label: 'More' },
 ];
 
