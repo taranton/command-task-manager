@@ -6,8 +6,8 @@ import {
 } from '@dnd-kit/sortable';
 import { theme } from '../../styles/theme';
 import { SortableTaskCard } from './TaskCard';
-import type { Task, Status } from '../../types';
-import { STATUS_LABELS } from '../../types';
+import type { Task, TaskStatus } from '../../types';
+import { TASK_STATUS_LABELS } from '../../types';
 
 const Column = styled.div<{ $isOver: boolean }>`
   min-width: ${theme.layout.kanbanColumnWidth};
@@ -80,7 +80,7 @@ const EmptyState = styled.div`
 `;
 
 interface KanbanColumnProps {
-  status: Status;
+  status: TaskStatus;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
 }
@@ -93,7 +93,7 @@ export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) 
     <Column ref={setNodeRef} $isOver={isOver}>
       <ColumnHeader>
         <StatusDot $color={color} />
-        <ColumnTitle>{STATUS_LABELS[status]}</ColumnTitle>
+        <ColumnTitle>{TASK_STATUS_LABELS[status]}</ColumnTitle>
         <ColumnCount>{tasks.length}</ColumnCount>
       </ColumnHeader>
 

@@ -20,9 +20,9 @@ import { KanbanColumn } from './KanbanColumn';
 import { TaskCardComponent } from './TaskCard';
 import { TaskDetail } from './TaskDetail';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { generatePosition } from '../../lib/lexorank';
-import type { Board, Task, Status } from '../../types';
-import { STATUS_ORDER, STATUS_LABELS } from '../../types';
+// Integer sort order: place between neighbors or at end
+import type { Board, Task, TaskStatus } from '../../types';
+import { TASK_STATUS_ORDER, TASK_STATUS_LABELS } from '../../types';
 
 // Styled components
 const Wrapper = styled.div`display: flex; flex: 1; overflow: hidden;`;
@@ -80,14 +80,14 @@ const measuring = {
 // ---- Component ----
 interface KanbanBoardProps {
   board: Board;
-  onStatusChange: (taskId: string, newStatus: Status) => void;
-  onPositionChange: (taskId: string, position: string, columnStatus: Status, reorderedTasks: Task[]) => void;
+  onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+  onPositionChange: (taskId: string, sortOrder: number, columnStatus: TaskStatus, reorderedTasks: Task[]) => void;
 }
 
 export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanBoardProps) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<Status>('in_progress');
+  const [mobileTab, setMobileTab] = useState<TaskStatus>('in_progress');
 
   // ---- Core state: items map is THE source of truth for card ordering ----
   // Initialized from board and synced via ref tracking
@@ -102,7 +102,7 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
     lastBoardRef.current = board;
     // Only update if items actually differ
     const newItems = buildItemsMap(board);
-    const needsUpdate = STATUS_ORDER.some(
+    const needsUpdate = TASK_STATUS_ORDER.some(
       (s) => (newItems[s] || []).join(',') !== (items[s] || []).join(',')
     );
     if (needsUpdate) {
@@ -191,17 +191,17 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
         // Commit to server
         const finalIdx = newOrder.indexOf(taskId);
         const colTasks = newOrder.map((id) => taskLookup[id]).filter(Boolean) as Task[];
-        const before = finalIdx > 0 ? colTasks[finalIdx - 1]?.position : undefined;
-        const after = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.position : undefined;
-        const newPosition = generatePosition(before, after);
-        const reordered = colTasks.map((t) => t.id === taskId ? { ...t, position: newPosition } : t);
-        onPositionChange(taskId, newPosition, overContainer as Status, reordered);
+        const beforeOrder = finalIdx > 0 ? colTasks[finalIdx - 1]?.sort_order : 0;
+        const afterOrder = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.sort_order : beforeOrder + 2000;
+        const newSortOrder = Math.floor((beforeOrder + afterOrder) / 2);
+        const reordered = colTasks.map((t) => t.id === taskId ? { ...t, sort_order: newSortOrder } : t);
+        onPositionChange(taskId, newSortOrder, overContainer as TaskStatus, reordered);
       }
     } else {
       // Cross column: items already updated by onDragOver, just commit
       const finalOrder = items[overContainer];
       const finalIdx = finalOrder.indexOf(taskId);
-      const newStatus = overContainer as Status;
+      const newStatus = overContainer as TaskStatus;
 
       const colTasks = finalOrder
         .map((id) => {
@@ -210,12 +210,12 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
         })
         .filter(Boolean) as Task[];
 
-      const before = finalIdx > 0 ? colTasks[finalIdx - 1]?.position : undefined;
-      const after = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.position : undefined;
-      const newPosition = generatePosition(before, after);
-      const reordered = colTasks.map((t) => t.id === taskId ? { ...t, position: newPosition, status: newStatus } : t);
+      const beforeOrder = finalIdx > 0 ? colTasks[finalIdx - 1]?.sort_order : 0;
+      const afterOrder = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.sort_order : beforeOrder + 2000;
+      const newSortOrder = Math.floor((beforeOrder + afterOrder) / 2);
+      const reordered = colTasks.map((t) => t.id === taskId ? { ...t, sort_order: newSortOrder, status: newStatus } : t);
 
-      onPositionChange(taskId, newPosition, newStatus, reordered);
+      onPositionChange(taskId, newSortOrder, newStatus, reordered);
       onStatusChange(taskId, newStatus);
     }
 
@@ -245,12 +245,12 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
     return (
       <MobileBoard>
         <StatusTabs>
-          {STATUS_ORDER.map((status) => {
+          {TASK_STATUS_ORDER.map((status) => {
             const col = board.columns.find((c) => c.status === status);
             return (
               <StatusTab key={status} $active={mobileTab === status} $color={theme.colors.status[status]}
                 onClick={() => setMobileTab(status)}>
-                {STATUS_LABELS[status]} ({col?.count || 0})
+                {TASK_STATUS_LABELS[status]} ({col?.count || 0})
               </StatusTab>
             );
           })}
@@ -260,7 +260,7 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
             <TaskCardComponent key={task.id} task={task} onClick={handleTaskClick} />
           )) : (
             <div style={{ textAlign: 'center', color: theme.colors.cadetGray, padding: '32px' }}>
-              No tasks in {STATUS_LABELS[mobileTab]}
+              No tasks in {TASK_STATUS_LABELS[mobileTab]}
             </div>
           )}
         </MobileCardList>
@@ -282,7 +282,7 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange }: KanbanB
         onDragCancel={handleDragCancel}
       >
         <DesktopBoard>
-          {STATUS_ORDER.map((status) => {
+          {TASK_STATUS_ORDER.map((status) => {
             const taskIds = items[status] || [];
             const tasks = taskIds.map((id) => taskLookup[id]).filter(Boolean) as Task[];
             return (

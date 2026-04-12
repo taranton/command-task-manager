@@ -43,9 +43,10 @@ func main() {
 	subtaskRepo := repository.NewSubtaskRepository(db)
 
 	// Services
+	changelog := service.NewChangeLogger(db)
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, rdb)
 	storyService := service.NewStoryService(storyRepo)
-	taskService := service.NewTaskService(taskRepo, subtaskRepo)
+	taskService := service.NewTaskService(taskRepo, subtaskRepo, storyRepo, changelog)
 
 	// WebSocket hub
 	hub := ws.NewHub(rdb)
@@ -59,6 +60,8 @@ func main() {
 	storyHandler := handler.NewStoryHandler(storyService)
 	taskHandler := handler.NewTaskHandler(taskService, hub)
 	subtaskHandler := handler.NewSubtaskHandler(taskService, hub)
+	commentRepo := repository.NewCommentRepository(db)
+	commentHandler := handler.NewCommentHandler(commentRepo)
 	boardHandler := handler.NewBoardHandler(taskService, storyService)
 	wsHandler := handler.NewWSHandler(hub, authService)
 
@@ -117,25 +120,32 @@ func main() {
 		r.Get("/api/v1/stories", storyHandler.List)
 		r.Post("/api/v1/stories", storyHandler.Create)
 		r.Get("/api/v1/stories/{id}", storyHandler.Get)
-		r.Put("/api/v1/stories/{id}", storyHandler.Update)
+		r.Patch("/api/v1/stories/{id}", storyHandler.Update)
 		r.Delete("/api/v1/stories/{id}", storyHandler.Delete)
 
 		// Tasks
 		r.Get("/api/v1/stories/{storyId}/tasks", taskHandler.ListByStory)
 		r.Post("/api/v1/stories/{storyId}/tasks", taskHandler.Create)
 		r.Get("/api/v1/tasks/{id}", taskHandler.Get)
-		r.Put("/api/v1/tasks/{id}", taskHandler.Update)
+		r.Patch("/api/v1/tasks/{id}", taskHandler.Update)
 		r.Delete("/api/v1/tasks/{id}", taskHandler.Delete)
 		r.Patch("/api/v1/tasks/{id}/status", taskHandler.UpdateStatus)
-		r.Patch("/api/v1/tasks/{id}/position", taskHandler.UpdatePosition)
+		r.Patch("/api/v1/tasks/{id}/reorder", taskHandler.UpdateSortOrder)
 		r.Get("/api/v1/tasks/my", taskHandler.MyTasks)
 
 		// Subtasks
 		r.Get("/api/v1/tasks/{taskId}/subtasks", subtaskHandler.List)
 		r.Post("/api/v1/tasks/{taskId}/subtasks", subtaskHandler.Create)
-		r.Put("/api/v1/subtasks/{id}", subtaskHandler.Update)
+		r.Patch("/api/v1/subtasks/{id}", subtaskHandler.Update)
 		r.Delete("/api/v1/subtasks/{id}", subtaskHandler.Delete)
 		r.Patch("/api/v1/subtasks/{id}/status", subtaskHandler.UpdateStatus)
+		r.Patch("/api/v1/subtasks/{id}/reorder", subtaskHandler.UpdateSortOrder)
+
+		// Comments
+		r.Post("/api/v1/{entity_type}/{entity_id}/comments", commentHandler.Create)
+		r.Get("/api/v1/{entity_type}/{entity_id}/comments", commentHandler.List)
+		r.Patch("/api/v1/comments/{id}", commentHandler.Update)
+		r.Delete("/api/v1/comments/{id}", commentHandler.Delete)
 
 		// Board
 		r.Get("/api/v1/board", boardHandler.GetBoard)

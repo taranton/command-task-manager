@@ -16,7 +16,7 @@ import {
 import { useUsers, useTeams } from '../../hooks/useUsers';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import type { BoardFilter, Status, Task, Priority } from '../../types';
+import type { BoardFilter, TaskStatus, Task, Priority } from '../../types';
 
 // ---- Layout ----
 const Container = styled.div`height: 100%; display: flex; flex-direction: column;`;
@@ -156,12 +156,12 @@ export default function BoardPage() {
   const createTask = useCreateTask(filter.story_id || firstStory?.id || '');
 
   const handleStatusChange = useCallback(
-    (taskId: string, newStatus: Status) => { updateStatus.mutate({ id: taskId, status: newStatus }); },
+    (taskId: string, newStatus: TaskStatus) => { updateStatus.mutate({ id: taskId, status: newStatus }); },
     [updateStatus]
   );
   const handlePositionChange = useCallback(
-    (taskId: string, position: string, columnStatus: Status, reorderedTasks: Task[]) => {
-      updatePosition.mutate({ id: taskId, position, reorderedColumn: { status: columnStatus, tasks: reorderedTasks } });
+    (taskId: string, sortOrder: number, columnStatus: TaskStatus, reorderedTasks: Task[]) => {
+      updatePosition.mutate({ id: taskId, sort_order: sortOrder, reorderedColumn: { status: columnStatus, tasks: reorderedTasks } });
     },
     [updatePosition]
   );

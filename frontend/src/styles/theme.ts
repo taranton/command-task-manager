@@ -12,25 +12,31 @@ export const theme = {
     silver: '#B2B8B8',
     mediumGray: '#666666',
 
-    // Status colors (task statuses)
+    // Status colors (all entity statuses)
     status: {
       backlog: '#9E9E9E',
-      todo: '#2196F3',
+      to_do: '#2196F3',
       in_progress: '#FF9800',
       in_review: '#9C27B0',
       done: '#4CAF50',
       closed: '#666666',
-    },
+      active: '#FF9800',    // Story status
+      // Legacy aliases
+      todo: '#2196F3',
+    } as Record<string, string>,
 
     // Status light backgrounds
     statusLight: {
       backlog: '#F5F5F5',
-      todo: '#E3F2FD',
+      to_do: '#E3F2FD',
       in_progress: '#FFF3E0',
       in_review: '#F3E5F5',
       done: '#E8F5E9',
       closed: '#F5F5F5',
-    },
+      active: '#FFF3E0',
+      // Legacy aliases
+      todo: '#E3F2FD',
+    } as Record<string, string>,
 
     // Priority colors
     priority: {

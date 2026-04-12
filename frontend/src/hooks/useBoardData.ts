@@ -98,14 +98,14 @@ export function useUpdateTaskPosition() {
   return useMutation({
     mutationFn: ({
       id,
-      position,
+      sort_order,
       status,
     }: {
       id: string;
-      position: string;
+      sort_order: number;
       status?: string;
       reorderedColumn?: { status: string; tasks: Task[] };
-    }) => api.patch(`/api/v1/tasks/${id}/position`, { position, status }),
+    }) => api.patch(`/api/v1/tasks/${id}/reorder`, { sort_order, status }),
     onMutate: async (vars) => {
       const key = [...currentBoardKey];
       await qc.cancelQueries({ queryKey: key });
@@ -152,7 +152,7 @@ export function useUpdateTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: { id: string } & Record<string, unknown>) =>
-      api.put<Task>(`/api/v1/tasks/${id}`, input),
+      api.patch<Task>(`/api/v1/tasks/${id}`, input),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['board'] });
       qc.invalidateQueries({ queryKey: ['task', vars.id] });

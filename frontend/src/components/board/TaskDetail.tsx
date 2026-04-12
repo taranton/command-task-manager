@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { FiX, FiCalendar, FiUser, FiPlus } from 'react-icons/fi';
+import { FiX, FiCalendar, FiUser, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend } from 'react-icons/fi';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { useTask } from '../../hooks/useBoardData';
+import { useComments, useAddComment, useEditComment, useDeleteComment } from '../../hooks/useComments';
+import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
-import type { Subtask, Status } from '../../types';
+import type { Subtask, SubtaskStatus } from '../../types';
 
 const Overlay = styled.div`
   position: fixed;
@@ -245,7 +247,7 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
 
   // Toggle subtask status
   const toggleSubtask = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Status }) =>
+    mutationFn: ({ id, status }: { id: string; status: SubtaskStatus }) =>
       api.patch(`/api/v1/subtasks/${id}/status`, { status }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task', taskId] });
@@ -279,7 +281,7 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
   const percent = subtasks.length > 0 ? Math.round((doneCount / subtasks.length) * 100) : 0;
 
   const handleToggleSubtask = (sub: Subtask) => {
-    const newStatus: Status = sub.status === 'done' ? 'todo' : 'done';
+    const newStatus: SubtaskStatus = sub.status === 'done' ? 'to_do' : 'done';
     toggleSubtask.mutate({ id: sub.id, status: newStatus });
   };
 
@@ -456,6 +458,10 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
                   <FiPlus size={14} /> Add subtask
                 </button>
               )}
+
+              {/* ---- Comments ---- */}
+              <Separator />
+              <CommentsSection taskId={taskId} />
             </>
           ) : (
             <Loading>Task not found</Loading>
@@ -474,5 +480,150 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
     <Overlay onClick={(e) => e.target === e.currentTarget && onClose()}>
       <OverlayPanel>{panelContent}</OverlayPanel>
     </Overlay>
+  );
+}
+
+// ---- Comments Section ----
+const CommentsList = styled.div`display: flex; flex-direction: column; gap: ${theme.spacing.md};`;
+const CommentItem = styled.div`display: flex; gap: ${theme.spacing.sm};`;
+const CommentBody = styled.div`flex: 1;`;
+const CommentHeader = styled.div`
+  display: flex; align-items: center; gap: ${theme.spacing.sm}; margin-bottom: 4px;
+`;
+const CommentAuthor = styled.span`
+  font-size: ${theme.typography.fontSize.sm}; font-weight: ${theme.typography.fontWeight.semibold};
+`;
+const CommentTime = styled.span`
+  font-size: ${theme.typography.fontSize.xs}; color: ${theme.colors.cadetGray};
+`;
+const CommentText = styled.div`
+  font-size: ${theme.typography.fontSize.sm}; color: ${theme.colors.davysGray};
+  line-height: 1.6; white-space: pre-wrap;
+`;
+const CommentActions = styled.div`
+  display: flex; gap: ${theme.spacing.sm}; margin-top: 4px;
+`;
+const CommentActionBtn = styled.button`
+  background: none; color: ${theme.colors.cadetGray}; font-size: ${theme.typography.fontSize.xs};
+  display: flex; align-items: center; gap: 4px; padding: 2px 4px;
+  &:hover { color: ${theme.colors.charcoal}; }
+`;
+const CommentInput = styled.div`
+  display: flex; gap: ${theme.spacing.sm}; align-items: flex-start; margin-top: ${theme.spacing.sm};
+`;
+const CommentTextarea = styled.textarea`
+  flex: 1; padding: 8px 12px; border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.md}; font-size: ${theme.typography.fontSize.sm};
+  font-family: inherit; min-height: 40px; resize: none; line-height: 1.5;
+  &:focus { border-color: ${theme.colors.vividOrange}; outline: none; min-height: 60px; }
+`;
+const SendBtn = styled.button<{ $active: boolean }>`
+  padding: 8px; border-radius: ${theme.borderRadius.md};
+  background: ${(p) => p.$active ? theme.colors.vividOrange : theme.colors.lightGray};
+  color: ${(p) => p.$active ? 'white' : theme.colors.cadetGray};
+  display: flex; align-items: center; transition: ${theme.transitions.default};
+  &:hover { ${(p) => p.$active && `background: ${theme.colors.deepOrange};`} }
+`;
+const EditedBadge = styled.span`
+  font-size: 10px; color: ${theme.colors.cadetGray}; font-style: italic;
+`;
+
+function CommentsSection({ taskId }: { taskId: string }) {
+  const { user: me } = useAuth();
+  const { data: comments, isLoading } = useComments('task', taskId);
+  const addComment = useAddComment('task', taskId);
+  const editComment = useEditComment();
+  const deleteComment = useDeleteComment();
+  const [newBody, setNewBody] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+
+  const handleSubmit = () => {
+    if (!newBody.trim()) return;
+    addComment.mutate(newBody.trim(), { onSuccess: () => setNewBody('') });
+  };
+
+  const handleEdit = (id: string) => {
+    if (!editBody.trim()) return;
+    editComment.mutate({ id, body: editBody.trim() }, { onSuccess: () => setEditingId(null) });
+  };
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <>
+      <SectionTitle>
+        <FiMessageCircle size={16} /> Comments {comments && comments.length > 0 && `(${comments.length})`}
+      </SectionTitle>
+
+      {isLoading ? (
+        <div style={{ color: theme.colors.cadetGray, fontSize: theme.typography.fontSize.sm }}>Loading...</div>
+      ) : (
+        <CommentsList>
+          {comments?.map((c) => (
+            <CommentItem key={c.id}>
+              <Avatar name={c.author_name || 'User'} url={c.author_avatar || undefined} size={28} />
+              <CommentBody>
+                <CommentHeader>
+                  <CommentAuthor>{c.author_name || 'User'}</CommentAuthor>
+                  <CommentTime>{formatTime(c.created_at)}</CommentTime>
+                  {c.is_edited && <EditedBadge>(edited)</EditedBadge>}
+                </CommentHeader>
+                {editingId === c.id ? (
+                  <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                    <CommentTextarea value={editBody} onChange={(e) => setEditBody(e.target.value)} autoFocus />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleEdit(c.id)}
+                        style={{ padding: '4px 12px', background: theme.colors.vividOrange, color: 'white', borderRadius: theme.borderRadius.sm, fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                        Save
+                      </button>
+                      <button onClick={() => setEditingId(null)}
+                        style={{ padding: '4px 12px', background: theme.colors.lightGray, borderRadius: theme.borderRadius.sm, fontSize: '12px', border: 'none', cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <CommentText>{c.body}</CommentText>
+                    {me?.id === c.author_id && (
+                      <CommentActions>
+                        <CommentActionBtn onClick={() => { setEditingId(c.id); setEditBody(c.body); }}>
+                          <FiEdit2 size={12} /> Edit
+                        </CommentActionBtn>
+                        <CommentActionBtn onClick={() => deleteComment.mutate(c.id)}>
+                          <FiTrash2 size={12} /> Delete
+                        </CommentActionBtn>
+                      </CommentActions>
+                    )}
+                  </>
+                )}
+              </CommentBody>
+            </CommentItem>
+          ))}
+        </CommentsList>
+      )}
+
+      <CommentInput>
+        <Avatar name={me?.full_name || '?'} size={28} />
+        <CommentTextarea
+          value={newBody}
+          onChange={(e) => setNewBody(e.target.value)}
+          placeholder="Write a comment..."
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+        />
+        <SendBtn $active={!!newBody.trim()} onClick={handleSubmit}>
+          <FiSend size={16} />
+        </SendBtn>
+      </CommentInput>
+    </>
   );
 }
