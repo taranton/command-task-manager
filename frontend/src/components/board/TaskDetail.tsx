@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { FiX, FiCalendar, FiUser, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRight } from 'react-icons/fi';
+import { FiX, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRight } from 'react-icons/fi';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
-import { useTask } from '../../hooks/useBoardData';
+import { useTask, useUpdateTask, useDeleteTask } from '../../hooks/useBoardData';
 import { useComments, useAddComment, useEditComment, useDeleteComment } from '../../hooks/useComments';
+import { useUsers } from '../../hooks/useUsers';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import type { Subtask, SubtaskStatus } from '../../types';
+import { TASK_STATUS_LABELS, PRIORITY_LABELS } from '../../types';
 
 const Overlay = styled.div`
   position: fixed;
@@ -220,6 +221,63 @@ const SubtaskTitle = styled.span<{ $done: boolean }>`
   text-decoration: ${(p) => (p.$done ? 'line-through' : 'none')};
 `;
 
+// Editable field wrappers
+const EditableField = styled.div`
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: ${theme.borderRadius.sm};
+  transition: ${theme.transitions.default};
+  &:hover { background: ${theme.colors.background}; }
+`;
+
+const InlineInput = styled.input`
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid ${theme.colors.vividOrange};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+`;
+
+const InlineTextarea = styled.textarea`
+  width: 100%;
+  padding: 8px;
+  border: 1px solid ${theme.colors.vividOrange};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: ${theme.typography.fontSize.sm};
+  font-family: inherit;
+  min-height: 80px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+`;
+
+const InlineSelect = styled.select`
+  padding: 4px 8px;
+  border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: ${theme.typography.fontSize.sm};
+  background: white;
+  cursor: pointer;
+  &:focus { border-color: ${theme.colors.vividOrange}; outline: none; }
+`;
+
+const DeleteBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: ${theme.colors.errorLight};
+  color: ${theme.colors.error};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.typography.fontSize.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  transition: ${theme.transitions.default};
+  &:hover { background: ${theme.colors.error}; color: white; }
+`;
+
 const ProgressContainer = styled.div`
   display: flex;
   align-items: center;
@@ -257,13 +315,7 @@ const Loading = styled.div`
   color: ${theme.colors.cadetGray};
 `;
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+// formatDate removed — using native date input
 
 interface TaskDetailProps {
   taskId: string;
@@ -323,6 +375,22 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
     createSubtask.mutate(newSubtaskTitle.trim());
   };
 
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+  const { data: users } = useUsers();
+  const [editingField, setEditingField] = useState<string | null>(null);
+
+  const saveField = (field: string, value: unknown) => {
+    updateTask.mutate({ id: taskId, [field]: value });
+    setEditingField(null);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Delete this task and all its subtasks?')) {
+      deleteTask.mutate(taskId, { onSuccess: onClose });
+    }
+  };
+
   const panelContent = (showClose: boolean) => (
     <>
       <PanelHeader>
@@ -341,48 +409,85 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
             <Loading>Loading...</Loading>
           ) : task ? (
             <>
-              <Title>{task.title}</Title>
+              {/* Title — editable */}
+              {editingField === 'title' ? (
+                <div style={{ marginBottom: theme.spacing.md }}>
+                  <InlineInput
+                    autoFocus
+                    defaultValue={task.title}
+                    onBlur={(e) => saveField('title', e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveField('title', (e.target as HTMLInputElement).value); if (e.key === 'Escape') setEditingField(null); }}
+                  />
+                </div>
+              ) : (
+                <EditableField onClick={() => setEditingField('title')}>
+                  <Title>{task.title}</Title>
+                </EditableField>
+              )}
 
               <MetaGrid>
+                {/* Status — dropdown */}
                 <MetaItem>
                   <MetaLabel>Status</MetaLabel>
                   <MetaValue>
-                    <StatusBadge status={task.status} />
+                    <InlineSelect
+                      value={task.status}
+                      onChange={(e) => saveField('status', e.target.value)}
+                    >
+                      {Object.entries(TASK_STATUS_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </InlineSelect>
                   </MetaValue>
                 </MetaItem>
+
+                {/* Priority — dropdown */}
                 <MetaItem>
                   <MetaLabel>Priority</MetaLabel>
                   <MetaValue>
-                    <PriorityBadge priority={task.priority} />
+                    <InlineSelect
+                      value={task.priority}
+                      onChange={(e) => saveField('priority', e.target.value)}
+                    >
+                      {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </InlineSelect>
                   </MetaValue>
                 </MetaItem>
+
+                {/* Assignee — dropdown */}
                 <MetaItem>
                   <MetaLabel>Assignee</MetaLabel>
                   <MetaValue>
-                    {task.assignee ? (
-                      <>
-                        <Avatar name={task.assignee.full_name} size={22} />
-                        {task.assignee.full_name}
-                      </>
-                    ) : (
-                      <>
-                        <FiUser size={14} color={theme.colors.cadetGray} />
-                        <span style={{ color: theme.colors.cadetGray }}>Unassigned</span>
-                      </>
-                    )}
+                    <InlineSelect
+                      value={task.assignee_id || ''}
+                      onChange={(e) => saveField('assignee_id', e.target.value || null)}
+                    >
+                      <option value="">Unassigned</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>{u.full_name}</option>
+                      ))}
+                    </InlineSelect>
                   </MetaValue>
                 </MetaItem>
+
+                {/* Deadline — date picker */}
                 <MetaItem>
                   <MetaLabel>Deadline</MetaLabel>
                   <MetaValue>
-                    {task.deadline ? (
-                      <>
-                        <FiCalendar size={14} />
-                        {formatDate(task.deadline)}
-                      </>
-                    ) : (
-                      <span style={{ color: theme.colors.cadetGray }}>No deadline</span>
-                    )}
+                    <input
+                      type="date"
+                      value={task.deadline ? task.deadline.split('T')[0] : ''}
+                      onChange={(e) => saveField('deadline', e.target.value || null)}
+                      style={{
+                        padding: '4px 8px',
+                        border: `1px solid ${theme.colors.border}`,
+                        borderRadius: theme.borderRadius.sm,
+                        fontSize: theme.typography.fontSize.sm,
+                        cursor: 'pointer',
+                      }}
+                    />
                   </MetaValue>
                 </MetaItem>
               </MetaGrid>
@@ -398,11 +503,28 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
 
               <Separator />
 
+              {/* Description — editable */}
               <SectionTitle>Description</SectionTitle>
-              {task.description ? (
-                <Description>{task.description}</Description>
+              {editingField === 'description' ? (
+                <div>
+                  <InlineTextarea
+                    autoFocus
+                    defaultValue={task.description || ''}
+                    onBlur={(e) => saveField('description', e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setEditingField(null); }}
+                  />
+                  <div style={{ fontSize: '11px', color: theme.colors.cadetGray, marginTop: '4px' }}>
+                    Click outside or press Escape to save
+                  </div>
+                </div>
               ) : (
-                <DescriptionPlaceholder>No description provided</DescriptionPlaceholder>
+                <EditableField onClick={() => setEditingField('description')}>
+                  {task.description ? (
+                    <Description>{task.description}</Description>
+                  ) : (
+                    <DescriptionPlaceholder>Click to add description...</DescriptionPlaceholder>
+                  )}
+                </EditableField>
               )}
 
               <Separator />
@@ -497,6 +619,12 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
               {/* ---- Comments ---- */}
               <Separator />
               <CommentsSection taskId={taskId} />
+
+              {/* Delete action */}
+              <Separator />
+              <DeleteBtn onClick={handleDelete}>
+                <FiTrash2 size={14} /> Delete Task
+              </DeleteBtn>
             </>
           ) : (
             <Loading>Task not found</Loading>
