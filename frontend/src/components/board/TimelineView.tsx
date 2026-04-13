@@ -128,15 +128,15 @@ const BarRow = styled.div<{ $cols: number }>`
   align-items: center; position: relative;
 `;
 const TaskBar = styled.div<{ $start: number; $span: number; $color: string; $progress: number }>`
-  grid-column: ${(p) => p.$start} / span ${(p) => Math.max(p.$span, 1)};
-  background: ${(p) => p.$color}30;
+  grid-column: ${(p) => p.$start} / span ${(p) => Math.max(p.$span, 4)};
+  background: ${(p) => p.$color}25;
   color: ${(p) => p.$color};
   font-size: 12px; font-weight: 600;
-  padding: 0; border-radius: 14px;
+  padding: 0; border-radius: 6px;
   white-space: nowrap; overflow: hidden;
   cursor: pointer; height: 28px; display: flex; align-items: center;
-  margin: 2px 0; position: relative; z-index: 2;
-  border: 1.5px solid ${(p) => p.$color}40;
+  margin: 3px 1px; position: relative; z-index: 2;
+  min-width: 140px;
 
   /* Progress fill from left */
   &::before {
@@ -144,8 +144,8 @@ const TaskBar = styled.div<{ $start: number; $span: number; $color: string; $pro
     position: absolute; left: 0; top: 0; bottom: 0;
     width: ${(p) => p.$progress}%;
     background: ${(p) => p.$color};
-    border-radius: 14px 0 0 14px;
-    ${(p) => p.$progress >= 100 ? 'border-radius: 14px;' : ''}
+    border-radius: 6px 0 0 6px;
+    ${(p) => p.$progress >= 100 ? 'border-radius: 6px;' : ''}
     transition: width 0.3s ease;
   }
 
