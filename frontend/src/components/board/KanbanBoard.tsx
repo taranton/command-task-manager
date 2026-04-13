@@ -87,7 +87,7 @@ interface KanbanBoardProps {
   onQuickAdd?: (status: TaskStatus) => void;
 }
 
-export function KanbanBoard({ board, stories, swimLanes = false, onStatusChange, onPositionChange, onQuickAdd }: KanbanBoardProps) {
+export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAdd }: KanbanBoardProps) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<TaskStatus>('in_progress');
@@ -289,7 +289,7 @@ export function KanbanBoard({ board, stories, swimLanes = false, onStatusChange,
             const taskIds = items[status] || [];
             const tasks = taskIds.map((id) => taskLookup[id]).filter(Boolean) as Task[];
             return (
-              <KanbanColumn key={status} status={status} tasks={tasks} stories={stories} swimLanes={swimLanes} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} />
+              <KanbanColumn key={status} status={status} tasks={tasks} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} />
             );
           })}
         </DesktopBoard>
