@@ -1,354 +1,268 @@
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronRight as FiExpand } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { Avatar } from '../ui/Avatar';
 import { TaskDetail } from './TaskDetail';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { Story, Task } from '../../types';
 
-// ---- Story colors ----
-const STORY_COLORS = ['#7C3AED', '#2196F3', '#FF9800', '#4CAF50', '#F44336', '#00BCD4', '#E91E63', '#795548'];
-function getStoryColor(idx: number): string {
-  return STORY_COLORS[idx % STORY_COLORS.length];
-}
+// ---- Colors ----
+const COLORS = ['#7C3AED', '#2196F3', '#FF9800', '#4CAF50', '#F44336', '#00BCD4', '#E91E63', '#795548'];
+function getColor(idx: number): string { return COLORS[idx % COLORS.length]; }
 
 // ---- Date helpers ----
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
+function addDays(d: Date, n: number): Date { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function startOfWeek(d: Date): Date {
-  const r = new Date(d);
-  const day = r.getDay();
-  r.setDate(r.getDate() - (day === 0 ? 6 : day - 1)); // Monday start
-  r.setHours(0, 0, 0, 0);
-  return r;
+  const r = new Date(d); r.setDate(r.getDate() - ((r.getDay() + 6) % 7)); r.setHours(0, 0, 0, 0); return r;
 }
-function formatDay(d: Date): string {
-  return d.getDate().toString();
-}
-function formatWeekRange(d: Date): string {
-  const end = addDays(d, 6);
-  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-}
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
-}
-function parseDate(s?: string): Date | null {
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+function daysBetween(a: Date, b: Date): number { return Math.round((b.getTime() - a.getTime()) / 86400000); }
+function parseD(s?: string): Date | null { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; }
+function fmtWeek(d: Date): string {
+  const e = addDays(d, 6);
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString('en-US', { day: 'numeric' })}`;
 }
 
 // ---- Styled ----
-const Container = styled.div`flex: 1; display: flex; flex-direction: column; overflow: hidden;`;
-
+const Wrap = styled.div`flex: 1; display: flex; flex-direction: column; overflow: hidden;`;
 const Toolbar = styled.div`
   display: flex; align-items: center; gap: ${theme.spacing.md};
-  padding: ${theme.spacing.sm} ${theme.spacing.lg};
-  background: ${theme.colors.white}; border-bottom: 1px solid ${theme.colors.border};
-  flex-shrink: 0;
+  padding: ${theme.spacing.sm} ${theme.spacing.lg}; background: ${theme.colors.white};
+  border-bottom: 1px solid ${theme.colors.border}; flex-shrink: 0;
 `;
 const NavBtn = styled.button`
-  background: none; color: ${theme.colors.davysGray}; padding: 6px;
-  border-radius: ${theme.borderRadius.sm}; display: flex;
-  &:hover { background: ${theme.colors.lightGray}; }
-  svg { width: 16px; height: 16px; }
+  background: none; color: ${theme.colors.davysGray}; padding: 6px; border-radius: 4px; display: flex;
+  &:hover { background: ${theme.colors.lightGray}; } svg { width: 16px; height: 16px; }
 `;
 const TodayBtn = styled.button`
-  padding: 4px 12px; border: 1px solid ${theme.colors.border};
-  border-radius: ${theme.borderRadius.pill}; font-size: ${theme.typography.fontSize.xs};
-  font-weight: ${theme.typography.fontWeight.medium}; background: white;
-  &:hover { background: ${theme.colors.lightGray}; }
+  padding: 4px 12px; border: 1px solid ${theme.colors.border}; border-radius: 20px;
+  font-size: 12px; font-weight: 500; background: white; &:hover { background: ${theme.colors.lightGray}; }
 `;
-const RangeLabel = styled.span`
-  font-size: ${theme.typography.fontSize.sm}; font-weight: ${theme.typography.fontWeight.medium};
-  color: ${theme.colors.charcoal};
+const RangeLabel = styled.span`font-size: 13px; font-weight: 500; color: ${theme.colors.charcoal};`;
+
+const ScrollArea = styled.div`flex: 1; overflow: auto;`;
+const Table = styled.div`display: flex; min-width: fit-content;`;
+const NameCol = styled.div`
+  min-width: 260px; max-width: 260px; flex-shrink: 0; position: sticky; left: 0; z-index: 10;
+  background: ${theme.colors.white}; border-right: 1px solid ${theme.colors.border};
+`;
+const TimeCol = styled.div`flex: 1;`;
+
+// Header
+const HeaderCell = styled.div`
+  height: 22px; font-size: 10px; font-weight: 600; color: ${theme.colors.cadetGray};
+  display: flex; align-items: center; border-bottom: 1px solid ${theme.colors.border};
+`;
+const NameHeader = styled(HeaderCell)`padding: 0 14px; height: 44px;`;
+const WeekLabel = styled.div<{ $w: number }>`
+  width: ${(p) => p.$w * 36}px; padding: 0 6px; border-right: 1px solid ${theme.colors.border};
+  display: flex; align-items: center; height: 22px; font-size: 10px; color: ${theme.colors.cadetGray};
+  font-weight: 600; white-space: nowrap; overflow: hidden;
+`;
+const DayLabel = styled.div<{ $today: boolean; $weekend: boolean }>`
+  width: 36px; text-align: center; height: 22px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; border-right: 1px solid ${theme.colors.border}10;
+  color: ${(p) => p.$today ? theme.colors.vividOrange : p.$weekend ? theme.colors.silver : theme.colors.cadetGray};
+  font-weight: ${(p) => p.$today ? '700' : '400'};
+  background: ${(p) => p.$weekend ? '#FAFAFA' : 'transparent'};
 `;
 
-const Grid = styled.div`flex: 1; overflow: auto; display: flex;`;
-const LeftPanel = styled.div`
-  min-width: 220px; max-width: 220px; border-right: 1px solid ${theme.colors.border};
-  background: ${theme.colors.white}; flex-shrink: 0; overflow-y: auto;
-`;
-const RightPanel = styled.div`flex: 1; overflow: auto; position: relative;`;
-
-// Header row (week labels + day numbers)
-const TimeHeader = styled.div<{ $cols: number }>`
-  display: grid; grid-template-columns: repeat(${(p) => p.$cols}, 36px);
-  position: sticky; top: 0; z-index: 5; background: ${theme.colors.white};
+// Rows
+const ROW_H = 36;
+const Row = styled.div<{ $h?: number }>`
+  height: ${(p) => p.$h || ROW_H}px; display: flex; align-items: center;
   border-bottom: 1px solid ${theme.colors.border};
 `;
-const WeekHeader = styled.div<{ $span: number }>`
-  grid-column: span ${(p) => p.$span};
-  padding: 4px 8px; font-size: 10px; font-weight: 600;
-  color: ${theme.colors.cadetGray}; border-right: 1px solid ${theme.colors.border};
-  white-space: nowrap; overflow: hidden;
+const StoryNameRow = styled(Row)`
+  padding: 0 8px; gap: 6px; cursor: pointer;
+  &:hover { background: ${theme.colors.background}; }
 `;
-const DayCell = styled.div<{ $isToday: boolean; $isWeekend: boolean }>`
-  padding: 2px; text-align: center; font-size: 10px;
-  color: ${(p) => p.$isToday ? theme.colors.vividOrange : p.$isWeekend ? theme.colors.silver : theme.colors.cadetGray};
-  font-weight: ${(p) => p.$isToday ? '700' : '400'};
-  background: ${(p) => p.$isWeekend ? '#FAFAFA' : 'transparent'};
-  border-right: 1px solid ${theme.colors.border}08;
-`;
-
-// Story elements
-const StoryName = styled.div<{ $color: string }>`
-  display: flex; align-items: center; gap: 8px;
-  font-size: ${theme.typography.fontSize.sm}; font-weight: ${theme.typography.fontWeight.semibold};
-`;
-const StoryDot = styled.div<{ $color: string }>`
-  width: 24px; height: 24px; border-radius: 6px;
-  background: ${(p) => p.$color}; color: white;
+const StoryDot = styled.div<{ $c: string }>`
+  width: 20px; height: 20px; border-radius: 5px; background: ${(p) => p.$c}; color: white;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; flex-shrink: 0;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
 `;
-const ProgressMini = styled.div`
-  margin-top: 6px; height: 3px; background: ${theme.colors.lightGray};
-  border-radius: 2px; overflow: hidden; width: 100%;
+const ExpandIcon = styled.span`
+  color: ${theme.colors.cadetGray}; display: flex; flex-shrink: 0;
+  svg { width: 14px; height: 14px; }
 `;
-const ProgressFill = styled.div<{ $pct: number; $color: string }>`
-  height: 100%; width: ${(p) => p.$pct}%;
-  background: ${(p) => p.$color}; border-radius: 2px;
+const StoryTitle = styled.span`
+  font-size: 13px; font-weight: 600; color: ${theme.colors.charcoal};
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+`;
+const TaskNameRow = styled(Row)`
+  padding: 0 8px 0 36px; gap: 6px; cursor: pointer;
+  &:hover { background: ${theme.colors.background}; }
+`;
+const TaskTitle = styled.span`
+  font-size: 12px; color: ${theme.colors.davysGray};
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
 `;
 
-// Task bars in right panel
-const BarRow = styled.div<{ $cols: number }>`
-  display: grid; grid-template-columns: repeat(${(p) => p.$cols}, 36px);
-  height: 34px; border-bottom: 1px solid ${theme.colors.border};
-  align-items: center; position: relative;
+// Bars
+const BarArea = styled.div<{ $days: number }>`
+  position: relative; width: ${(p) => p.$days * 36}px; height: ${ROW_H}px;
 `;
-const StoryHeaderSpacer = styled.div<{ $color: string }>`
-  height: auto; min-height: 50px;
-  border-bottom: 1px solid ${theme.colors.border};
-  background: ${(p) => p.$color}08;
-  border-left: 3px solid ${(p) => p.$color};
-`;
-const TaskBar = styled.div<{ $start: number; $span: number; $color: string; $progress: number }>`
-  grid-column: ${(p) => p.$start} / span ${(p) => Math.max(p.$span, 4)};
-  background: ${(p) => p.$color}25;
-  color: ${(p) => p.$color};
-  font-size: 12px; font-weight: 600;
-  padding: 0; border-radius: 6px;
-  white-space: nowrap; overflow: hidden;
-  cursor: pointer; height: 28px; display: flex; align-items: center;
-  margin: 3px 1px; position: relative; z-index: 2;
-  min-width: 140px;
-
-  /* Progress fill from left */
+const Bar = styled.div<{ $left: number; $width: number; $color: string; $progress: number }>`
+  position: absolute; top: 6px; height: ${ROW_H - 12}px;
+  left: ${(p) => p.$left}px; width: ${(p) => Math.max(p.$width, 80)}px;
+  background: ${(p) => p.$color}20; border-radius: 4px;
+  display: flex; align-items: center; overflow: hidden;
+  cursor: pointer;
   &::before {
-    content: '';
-    position: absolute; left: 0; top: 0; bottom: 0;
-    width: ${(p) => p.$progress}%;
-    background: ${(p) => p.$color};
-    border-radius: 6px 0 0 6px;
-    ${(p) => p.$progress >= 100 ? 'border-radius: 6px;' : ''}
-    transition: width 0.3s ease;
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: ${(p) => p.$progress}%; background: ${(p) => p.$color}; border-radius: 4px 0 0 4px;
+    ${(p) => p.$progress >= 100 ? 'border-radius: 4px;' : ''}
   }
-
-  &:hover {
-    box-shadow: 0 2px 8px ${(p) => p.$color}40;
-    z-index: 3;
-  }
+  &:hover { box-shadow: 0 1px 4px ${(p) => p.$color}40; }
 `;
-const TaskBarText = styled.span<{ $filled: boolean }>`
-  position: relative; z-index: 1;
-  padding: 0 10px;
+const BarText = styled.span<{ $filled: boolean }>`
+  position: relative; z-index: 1; padding: 0 6px;
+  font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: ${(p) => p.$filled ? 'white' : 'inherit'};
-  display: flex; align-items: center; gap: 6px;
-  overflow: hidden; text-overflow: ellipsis;
 `;
-const TaskHours = styled.span`
-  font-size: 9px; background: rgba(0,0,0,0.1);
-  padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
-`;
-
-// Today line
-const TodayLine = styled.div<{ $left: number }>`
-  position: absolute; top: 0; bottom: 0;
-  left: ${(p) => p.$left}px; width: 2px;
-  background: ${theme.colors.error}; z-index: 4;
-  pointer-events: none;
+const TodayLine = styled.div<{ $x: number }>`
+  position: absolute; top: 0; bottom: 0; left: ${(p) => p.$x}px; width: 2px;
+  background: ${theme.colors.error}; z-index: 5; pointer-events: none;
 `;
 
 // ---- Component ----
-interface TimelineViewProps {
-  stories: Story[];
-  allTasks: Task[];
-}
+interface Props { stories: Story[]; allTasks: Task[]; }
 
-export function TimelineView({ stories, allTasks }: TimelineViewProps) {
+export function TimelineView({ stories, allTasks }: Props) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-
+  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [viewStart, setViewStart] = useState(() => startOfWeek(addDays(today, -7)));
-  const totalDays = 35; // 5 weeks
+  const totalDays = 42; // 6 weeks
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(stories.map((s) => s.id)));
 
-  // Generate days array
-  const days = useMemo(() => {
-    const arr: Date[] = [];
-    for (let i = 0; i < totalDays; i++) arr.push(addDays(viewStart, i));
-    return arr;
-  }, [viewStart, totalDays]);
-
-  // Group days by week for header
+  const days = useMemo(() => Array.from({ length: totalDays }, (_, i) => addDays(viewStart, i)), [viewStart, totalDays]);
   const weeks = useMemo(() => {
     const w: { start: Date; days: number }[] = [];
-    let curr = startOfWeek(days[0]);
-    let count = 0;
-    for (const d of days) {
-      const ws = startOfWeek(d);
-      if (ws.getTime() !== curr.getTime()) {
-        w.push({ start: curr, days: count });
-        curr = ws;
-        count = 1;
-      } else {
-        count++;
-      }
-    }
-    if (count > 0) w.push({ start: curr, days: count });
+    let curr = startOfWeek(days[0]); let n = 0;
+    for (const d of days) { const ws = startOfWeek(d); if (ws.getTime() !== curr.getTime()) { w.push({ start: curr, days: n }); curr = ws; n = 1; } else n++; }
+    if (n > 0) w.push({ start: curr, days: n });
     return w;
   }, [days]);
 
-  // Build story data with tasks
-  const storyData = useMemo(() => {
-    return stories.map((story, idx) => {
-      const tasks = allTasks.filter((t) => t.story_id === story.id);
-      const scheduled = tasks.filter((t) => t.start_date || t.deadline);
-      const unscheduled = tasks.length - scheduled.length;
-      return { story, tasks, scheduled, unscheduled, color: getStoryColor(idx) };
-    });
-  }, [stories, allTasks]);
+  const storyData = useMemo(() => stories.map((story, idx) => {
+    const tasks = allTasks.filter((t) => t.story_id === story.id);
+    // Story bar: earliest start → latest deadline
+    let minDate: Date | null = null, maxDate: Date | null = null;
+    for (const t of tasks) {
+      const s = parseD(t.start_date) || parseD(t.deadline);
+      const e = parseD(t.deadline) || s;
+      if (s && (!minDate || s < minDate)) minDate = s;
+      if (e && (!maxDate || e > maxDate)) maxDate = e;
+    }
+    return { story, tasks, color: getColor(idx), minDate, maxDate };
+  }), [stories, allTasks]);
 
-  const todayCol = daysBetween(viewStart, today) + 1;
-  const todayLeft = (todayCol - 1) * 36 + 18;
+  const todayX = daysBetween(viewStart, today) * 36 + 18;
+  const toggle = (id: string) => setExpanded((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const calcBar = (start: Date | null, end: Date | null) => {
+    if (!start || !end) return null;
+    const l = daysBetween(viewStart, start) * 36;
+    const w = Math.max((daysBetween(start, end) + 1) * 36, 36);
+    if (l + w < 0 || l > totalDays * 36) return null;
+    return { left: l, width: w };
+  };
 
   return (
-    <Container>
+    <Wrap>
       <Toolbar>
         <NavBtn onClick={() => setViewStart(addDays(viewStart, -7))}><FiChevronLeft /></NavBtn>
         <NavBtn onClick={() => setViewStart(addDays(viewStart, 7))}><FiChevronRight /></NavBtn>
         <TodayBtn onClick={() => setViewStart(startOfWeek(addDays(today, -7)))}>Today</TodayBtn>
-        <RangeLabel>{formatWeekRange(viewStart)} — {formatWeekRange(addDays(viewStart, 28))}</RangeLabel>
+        <RangeLabel>{fmtWeek(viewStart)}</RangeLabel>
       </Toolbar>
 
-      <Grid>
-        <LeftPanel>
-          {/* Spacer for header */}
-          <div style={{ height: 44, borderBottom: `1px solid ${theme.colors.border}` }} />
-          {storyData.map(({ story, tasks, unscheduled, color }) => (
-            <div key={story.id}>
-              {/* Story header — spans visually, not a task row */}
-              <div style={{
-                padding: '8px 14px', background: `${color}10`,
-                borderBottom: `1px solid ${theme.colors.border}`, borderLeft: `3px solid ${color}`,
-              }}>
-                <StoryName $color={color}>
-                  <StoryDot $color={color}>{story.title.charAt(0).toUpperCase()}</StoryDot>
-                  {story.title}
-                </StoryName>
-                <ProgressMini>
-                  <ProgressFill $pct={story.progress} $color={color} />
-                </ProgressMini>
-                <div style={{ fontSize: '10px', color: theme.colors.cadetGray, marginTop: '2px' }}>
-                  {tasks.length} tasks{unscheduled > 0 ? ` · ${unscheduled} unscheduled` : ''}
-                </div>
+      <ScrollArea>
+        <Table>
+          {/* ---- Left: names ---- */}
+          <NameCol>
+            <NameHeader>Task</NameHeader>
+            {storyData.map(({ story, tasks, color }) => (
+              <div key={story.id}>
+                <StoryNameRow onClick={() => toggle(story.id)}>
+                  <ExpandIcon>{expanded.has(story.id) ? <FiChevronDown /> : <FiExpand />}</ExpandIcon>
+                  <StoryDot $c={color}>{story.title.charAt(0)}</StoryDot>
+                  <StoryTitle>{story.title}</StoryTitle>
+                  <span style={{ fontSize: '10px', color: theme.colors.cadetGray }}>{story.progress}%</span>
+                </StoryNameRow>
+                {expanded.has(story.id) && tasks.map((task) => (
+                  <TaskNameRow key={task.id} onClick={() => setSelectedTaskId(task.id)}>
+                    {task.assignee && <Avatar name={task.assignee.full_name} url={task.assignee.avatar_url} size={18} />}
+                    <TaskTitle>{task.title}</TaskTitle>
+                  </TaskNameRow>
+                ))}
               </div>
-              {/* Individual task rows */}
-              {tasks.map((task) => (
-                <div key={task.id} style={{
-                  height: 34, display: 'flex', alignItems: 'center',
-                  padding: '0 14px 0 32px', borderBottom: `1px solid ${theme.colors.border}`,
-                  fontSize: '12px', color: theme.colors.davysGray,
-                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                  cursor: 'pointer',
-                }} onClick={() => setSelectedTaskId(task.id)}>
-                  {task.assignee && <Avatar name={task.assignee.full_name} url={task.assignee.avatar_url} size={18} />}
-                  <span style={{ marginLeft: '6px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </LeftPanel>
+            ))}
+          </NameCol>
 
-        <RightPanel>
-          {/* Time header */}
-          <div style={{ display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 5, background: 'white' }}>
-            <TimeHeader $cols={totalDays}>
-              {weeks.map((w, i) => (
-                <WeekHeader key={i} $span={w.days}>{formatWeekRange(w.start)}</WeekHeader>
-              ))}
-            </TimeHeader>
-            <TimeHeader $cols={totalDays}>
+          {/* ---- Right: timeline ---- */}
+          <TimeCol>
+            {/* Week headers */}
+            <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}` }}>
+              {weeks.map((w, i) => <WeekLabel key={i} $w={w.days}>{fmtWeek(w.start)}</WeekLabel>)}
+            </div>
+            {/* Day numbers */}
+            <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}` }}>
               {days.map((d, i) => (
-                <DayCell key={i} $isToday={d.getTime() === today.getTime()} $isWeekend={d.getDay() === 0 || d.getDay() === 6}>
-                  {formatDay(d)}
-                </DayCell>
+                <DayLabel key={i} $today={d.getTime() === today.getTime()} $weekend={d.getDay() === 0 || d.getDay() === 6}>
+                  {d.getDate()}
+                </DayLabel>
               ))}
-            </TimeHeader>
-          </div>
-
-          {/* Task bars — each task gets its own row */}
-          {storyData.map(({ story, tasks, color }) => (
-            <div key={story.id}>
-              {/* Story header spacer on right side — matches left panel */}
-              <StoryHeaderSpacer $color={color} />
-              {tasks.map((task) => {
-                const start = parseDate(task.start_date) || parseDate(task.deadline);
-                const end = parseDate(task.deadline) || (start ? addDays(start, 7) : null);
-
-                const startCol = start ? Math.max(daysBetween(viewStart, start) + 1, 1) : 1;
-                const endCol = end ? Math.min(daysBetween(viewStart, end) + 1, totalDays) : 1;
-                const span = Math.max(endCol - startCol + 1, 1);
-                const isVisible = start && end && startCol <= totalDays && endCol >= 1;
-                const progress = task.progress || 0;
-
-                return (
-                  <BarRow key={task.id} $cols={totalDays}>
-                    {isVisible ? (
-                      <TaskBar
-                        $start={Math.max(startCol, 1)}
-                        $span={span}
-                        $color={color}
-                        $progress={progress}
-                        onClick={() => setSelectedTaskId(task.id)}
-                        title={`${task.title}\n${task.start_date || '?'} → ${task.deadline || '?'}\nProgress: ${progress}%`}
-                      >
-                        <TaskBarText $filled={progress > 40}>
-                          {task.title}
-                          {task.estimated_hours && <TaskHours>{task.estimated_hours}h</TaskHours>}
-                        </TaskBarText>
-                      </TaskBar>
-                    ) : (
-                      <div style={{ gridColumn: '1 / span 4', padding: '4px 8px', fontSize: '11px', color: theme.colors.cadetGray, fontStyle: 'italic' }}>
-                        {task.title} — no dates
-                      </div>
-                    )}
-                  </BarRow>
-                );
-              })}
             </div>
-          ))}
 
-          {/* Today line */}
-          {todayCol >= 1 && todayCol <= totalDays && (
-            <TodayLine $left={todayLeft} />
-          )}
-        </RightPanel>
-      </Grid>
+            {/* Bars */}
+            {storyData.map(({ story, tasks, color, minDate, maxDate }) => {
+              const storyBar = calcBar(minDate, maxDate);
+              return (
+                <div key={story.id} style={{ position: 'relative' }}>
+                  {/* Story aggregate bar */}
+                  <BarArea $days={totalDays}>
+                    {storyBar && (
+                      <Bar $left={storyBar.left} $width={storyBar.width} $color={color} $progress={story.progress}>
+                        <BarText $filled={story.progress > 30}>{story.title} — {story.progress}%</BarText>
+                      </Bar>
+                    )}
+                    {todayX > 0 && todayX < totalDays * 36 && <TodayLine $x={todayX} />}
+                  </BarArea>
+
+                  {/* Task bars */}
+                  {expanded.has(story.id) && tasks.map((task) => {
+                    const s = parseD(task.start_date) || parseD(task.deadline);
+                    const e = parseD(task.deadline) || (s ? addDays(s, 5) : null);
+                    const bar = calcBar(s, e);
+                    return (
+                      <BarArea key={task.id} $days={totalDays}>
+                        {bar ? (
+                          <Bar $left={bar.left} $width={bar.width} $color={color} $progress={task.progress}
+                            onClick={() => setSelectedTaskId(task.id)}>
+                            <BarText $filled={task.progress > 30}>{task.title}</BarText>
+                          </Bar>
+                        ) : (
+                          <div style={{ height: ROW_H, display: 'flex', alignItems: 'center', paddingLeft: 8, fontSize: 11, color: theme.colors.cadetGray, fontStyle: 'italic' }}>
+                            no dates set
+                          </div>
+                        )}
+                        {todayX > 0 && todayX < totalDays * 36 && <TodayLine $x={todayX} />}
+                      </BarArea>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </TimeCol>
+        </Table>
+      </ScrollArea>
 
       {selectedTaskId && (
         <TaskDetail taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} inline={!isMobile} />
       )}
-    </Container>
+    </Wrap>
   );
 }
