@@ -101,6 +101,12 @@ $PG "CREATE INDEX IF NOT EXISTS idx_tasks_sort_order ON tasks(sort_order);" 2>/d
 $PG "CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at);" 2>/dev/null || true
 echo "   Indexes ✓"
 
+# Grant permissions to app user
+$PG "GRANT ALL ON command_comments TO command;" 2>/dev/null || true
+$PG "GRANT ALL ON command_changelog TO command;" 2>/dev/null || true
+$PG "GRANT ALL ON command_attachments TO command;" 2>/dev/null || true
+echo "   Permissions ✓"
+
 echo "   Migration complete!"
 
 # 3. Build backend
