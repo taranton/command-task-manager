@@ -201,22 +201,25 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAd
         onPositionChange(taskId, newSortOrder, overContainer as TaskStatus, reordered);
       }
     } else {
-      // Cross column: items already updated by onDragOver, just commit
-      const finalOrder = items[overContainer];
-      const finalIdx = finalOrder.indexOf(taskId);
+      // Cross column: place card at the END of the target column (simplest, no insert-between issues)
       const newStatus = overContainer as TaskStatus;
+      const targetItems = items[overContainer].filter((id) => id !== taskId);
 
-      const colTasks = finalOrder
-        .map((id) => {
-          const t = taskLookup[id];
-          return t && id === taskId ? { ...t, status: newStatus } : t;
-        })
-        .filter(Boolean) as Task[];
+      // Remove from source, add to end of target
+      const newItems = { ...items };
+      for (const key of Object.keys(newItems)) {
+        newItems[key] = newItems[key].filter((id) => id !== taskId);
+      }
+      newItems[overContainer] = [...targetItems, taskId];
+      setItems(newItems);
 
-      const beforeOrder = finalIdx > 0 ? colTasks[finalIdx - 1]?.sort_order : 0;
-      const afterOrder = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.sort_order : beforeOrder + 2000;
-      const newSortOrder = Math.floor((beforeOrder + afterOrder) / 2);
-      const reordered = colTasks.map((t) => t.id === taskId ? { ...t, sort_order: newSortOrder, status: newStatus } : t);
+      // Compute sort_order: after the last card in target column
+      const targetTasks = targetItems.map((id) => taskLookup[id]).filter(Boolean) as Task[];
+      const maxOrder = targetTasks.length > 0 ? Math.max(...targetTasks.map((t) => t.sort_order)) : 0;
+      const newSortOrder = maxOrder + 1000;
+
+      const movedTask = taskLookup[taskId];
+      const reordered = [...targetTasks, movedTask ? { ...movedTask, sort_order: newSortOrder, status: newStatus } : null].filter(Boolean) as Task[];
 
       onPositionChange(taskId, newSortOrder, newStatus, reordered);
       onStatusChange(taskId, newStatus);
