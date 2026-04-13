@@ -4,7 +4,7 @@ import { FiX, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRigh
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
-import { useTask, useUpdateTask, useDeleteTask } from '../../hooks/useBoardData';
+import { useTask, useUpdateTask, useDeleteTask, useStories } from '../../hooks/useBoardData';
 import { useComments, useAddComment, useEditComment, useDeleteComment } from '../../hooks/useComments';
 import { useUsers } from '../../hooks/useUsers';
 import { useAuth } from '../../hooks/useAuth';
@@ -520,25 +520,10 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
                 <MetaItem>
                   <MetaLabel>Story</MetaLabel>
                   <MetaValue>
-                    <InlineSelect
-                      value={task.story_id || ''}
-                      onChange={(e) => saveField('story_id', e.target.value)}
-                    >
-                      {/* Stories will be passed via context or fetched */}
-                      <option value={task.story_id}>{task.story_title || 'Current Story'}</option>
-                    </InlineSelect>
+                    <StorySelector taskId={taskId} currentStoryId={task.story_id} currentStoryTitle={task.story_title} />
                   </MetaValue>
                 </MetaItem>
               </MetaGrid>
-
-              {task.story_title && (
-                <div style={{ marginBottom: theme.spacing.md }}>
-                  <MetaLabel>Story</MetaLabel>
-                  <div style={{ fontSize: theme.typography.fontSize.sm, marginTop: '4px' }}>
-                    {task.story_title}
-                  </div>
-                </div>
-              )}
 
               <Separator />
 
@@ -693,6 +678,34 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
     <Overlay onClick={(e) => e.target === e.currentTarget && onClose()}>
       <OverlayPanel>{panelContent(true)}</OverlayPanel>
     </Overlay>
+  );
+}
+
+// ---- Story Selector ----
+function StorySelector({ taskId, currentStoryId, currentStoryTitle }: {
+  taskId: string; currentStoryId: string; currentStoryTitle?: string;
+}) {
+  const { data: storiesData } = useStories();
+  const updateTask = useUpdateTask();
+  const stories = storiesData?.data || [];
+
+  return (
+    <InlineSelect
+      value={currentStoryId}
+      onChange={(e) => {
+        if (e.target.value !== currentStoryId) {
+          updateTask.mutate({ id: taskId, story_id: e.target.value });
+        }
+      }}
+    >
+      {stories.length > 0 ? (
+        stories.map((s) => (
+          <option key={s.id} value={s.id}>{s.title}</option>
+        ))
+      ) : (
+        <option value={currentStoryId}>{currentStoryTitle || 'Story'}</option>
+      )}
+    </InlineSelect>
   );
 }
 
