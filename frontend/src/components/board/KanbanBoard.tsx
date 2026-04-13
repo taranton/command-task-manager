@@ -80,12 +80,14 @@ const measuring = {
 // ---- Component ----
 interface KanbanBoardProps {
   board: Board;
+  stories?: Array<{ id: string; title: string; progress: number }>;
+  swimLanes?: boolean;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onPositionChange: (taskId: string, sortOrder: number, columnStatus: TaskStatus, reorderedTasks: Task[]) => void;
   onQuickAdd?: (status: TaskStatus) => void;
 }
 
-export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAdd }: KanbanBoardProps) {
+export function KanbanBoard({ board, stories, swimLanes = false, onStatusChange, onPositionChange, onQuickAdd }: KanbanBoardProps) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<TaskStatus>('in_progress');
@@ -287,7 +289,7 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAd
             const taskIds = items[status] || [];
             const tasks = taskIds.map((id) => taskLookup[id]).filter(Boolean) as Task[];
             return (
-              <KanbanColumn key={status} status={status} tasks={tasks} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} />
+              <KanbanColumn key={status} status={status} tasks={tasks} stories={stories} swimLanes={swimLanes} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} />
             );
           })}
         </DesktopBoard>

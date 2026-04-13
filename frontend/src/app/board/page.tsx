@@ -13,7 +13,6 @@ import {
   useStories,
   useUpdateTaskStatus,
   useUpdateTaskPosition,
-  useCreateTask,
   useCreateStory,
 } from '../../hooks/useBoardData';
 import { useUsers, useTeams } from '../../hooks/useUsers';
@@ -147,6 +146,8 @@ export default function BoardPage() {
   const [filter, setFilter] = useState<BoardFilter>({});
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
+  const [swimLanes, setSwimLanes] = useState(true);
+  const [createTaskStoryId, setCreateTaskStoryId] = useState<string>('');
   const [openDrop, setOpenDrop] = useState<string | null>(null);
 
   const { data: board, isLoading, error } = useBoardData(filter);
@@ -159,7 +160,6 @@ export default function BoardPage() {
   const updatePosition = useUpdateTaskPosition();
   const createStory = useCreateStory();
   const firstStory = stories[0];
-  const createTask = useCreateTask(filter.story_id || firstStory?.id || '');
 
   const handleStatusChange = useCallback(
     (taskId: string, newStatus: TaskStatus) => { updateStatus.mutate({ id: taskId, status: newStatus }); },
@@ -304,6 +304,13 @@ export default function BoardPage() {
         </ChipWrap>
 
         {/* Active count + clear */}
+        {/* Swim lanes toggle */}
+        {viewMode === 'kanban' && (
+          <Chip $active={swimLanes} onClick={() => setSwimLanes(!swimLanes)}>
+            Swim Lanes
+          </Chip>
+        )}
+
         {activeFilterCount > 0 && (
           <ActiveFilters>
             <ClearBtn onClick={clearFilters}>Clear all ({activeFilterCount})</ClearBtn>
@@ -315,7 +322,7 @@ export default function BoardPage() {
       {isLoading || !board ? (
         <CenterMsg>Loading board...</CenterMsg>
       ) : viewMode === 'kanban' ? (
-        <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
+        <KanbanBoard board={board} stories={stories.map(s => ({ id: s.id, title: s.title, progress: s.progress }))} swimLanes={swimLanes} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
       ) : (
         <BacklogTable
           stories={stories}
@@ -325,22 +332,26 @@ export default function BoardPage() {
 
       {isMobile && <Fab onClick={() => setShowCreateTask(true)}><FiPlus /></Fab>}
 
-      {showCreateTask && (filter.story_id || firstStory?.id) && (
+      {showCreateTask && (createTaskStoryId || filter.story_id || firstStory?.id) && (
         <CreateTaskModal
-          storyId={filter.story_id || firstStory?.id || ''}
-          storyTitle={stories.find((s) => s.id === (filter.story_id || firstStory?.id))?.title || 'Story'}
-          onClose={() => setShowCreateTask(false)}
+          storyId={createTaskStoryId || filter.story_id || firstStory?.id || ''}
+          storyTitle={stories.find((s) => s.id === (createTaskStoryId || filter.story_id || firstStory?.id))?.title || 'Story'}
+          stories={stories.map((s) => ({ id: s.id, title: s.title }))}
+          onStoryChange={setCreateTaskStoryId}
+          onClose={() => { setShowCreateTask(false); setCreateTaskStoryId(''); }}
           onSubmit={(input, subtaskTitles) => {
-            createTask.mutate(input, {
-              onSuccess: async (task) => {
-                for (const st of subtaskTitles) {
-                  try { await api.post(`/api/v1/tasks/${task.id}/subtasks`, { title: st }); } catch { /* continue */ }
-                }
-                setShowCreateTask(false);
-              },
-            });
+            const sid = createTaskStoryId || filter.story_id || firstStory?.id || '';
+            api.post(`/api/v1/stories/${sid}/tasks`, input).then(async (task: any) => {
+              for (const st of subtaskTitles) {
+                try { await api.post(`/api/v1/tasks/${task.id}/subtasks`, { title: st }); } catch { /* continue */ }
+              }
+              setShowCreateTask(false);
+              setCreateTaskStoryId('');
+              // Refresh board
+              window.location.reload();
+            }).catch(() => {});
           }}
-          isLoading={createTask.isPending}
+          isLoading={false}
         />
       )}
 

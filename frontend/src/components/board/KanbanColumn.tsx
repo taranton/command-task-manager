@@ -96,16 +96,59 @@ const QuickAddBtn = styled.button`
   svg { width: 14px; height: 14px; }
 `;
 
+// Swim lane header
+const STORY_COLORS = ['#7C3AED', '#2196F3', '#FF9800', '#4CAF50', '#F44336', '#00BCD4', '#E91E63'];
+function storyColor(title: string): string {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = title.charCodeAt(i) + ((h << 5) - h);
+  return STORY_COLORS[Math.abs(h) % STORY_COLORS.length];
+}
+
+const SwimLaneHeader = styled.div<{ $color: string }>`
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; margin: 4px 0;
+  background: ${(p) => p.$color}15;
+  border-left: 3px solid ${(p) => p.$color};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: 11px; font-weight: ${theme.typography.fontWeight.semibold};
+  color: ${(p) => p.$color};
+`;
+const SwimProgress = styled.span`font-size: 10px; opacity: 0.7;`;
+
+interface StoryInfo {
+  id: string;
+  title: string;
+  progress: number;
+}
+
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
+  stories?: StoryInfo[];
+  swimLanes?: boolean;
   onTaskClick: (task: Task) => void;
   onQuickAdd?: (status: TaskStatus) => void;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, stories, swimLanes = false, onTaskClick, onQuickAdd }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const color = theme.colors.status[status] || theme.colors.cadetGray;
+
+  // Group tasks by story for swim lanes
+  const groupedTasks = swimLanes ? (() => {
+    const groups: { story: StoryInfo | null; tasks: Task[] }[] = [];
+    const byStory = new Map<string, Task[]>();
+    for (const t of tasks) {
+      const key = t.story_id || 'none';
+      if (!byStory.has(key)) byStory.set(key, []);
+      byStory.get(key)!.push(t);
+    }
+    for (const [storyId, storyTasks] of byStory) {
+      const story = stories?.find((s) => s.id === storyId) || null;
+      groups.push({ story, tasks: storyTasks });
+    }
+    return groups;
+  })() : null;
 
   return (
     <Column ref={setNodeRef} $isOver={isOver}>
@@ -121,13 +164,25 @@ export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd }: KanbanC
       >
         <CardList>
           {tasks.length > 0 ? (
-            tasks.map((task) => (
-              <SortableTaskCard
-                key={task.id}
-                task={task}
-                onClick={onTaskClick}
-              />
-            ))
+            swimLanes && groupedTasks ? (
+              groupedTasks.map((group) => (
+                <div key={group.story?.id || 'none'}>
+                  {group.story && (
+                    <SwimLaneHeader $color={storyColor(group.story.title)}>
+                      {group.story.title}
+                      <SwimProgress>{group.story.progress}%</SwimProgress>
+                    </SwimLaneHeader>
+                  )}
+                  {group.tasks.map((task) => (
+                    <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} hideStoryMarker />
+                  ))}
+                </div>
+              ))
+            ) : (
+              tasks.map((task) => (
+                <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} />
+              ))
+            )
           ) : (
             <EmptyState>No tasks</EmptyState>
           )}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -146,6 +147,51 @@ func main() {
 		r.Get("/api/v1/{entity_type}/{entity_id}/comments", commentHandler.List)
 		r.Patch("/api/v1/comments/{id}", commentHandler.Update)
 		r.Delete("/api/v1/comments/{id}", commentHandler.Delete)
+
+		// Changelog
+		r.Get("/api/v1/{entity_type}/{entity_id}/changelog", func(w http.ResponseWriter, r *http.Request) {
+			entityType := chi.URLParam(r, "entity_type")
+			entityID := chi.URLParam(r, "entity_id")
+			rows, err := db.Query(r.Context(), `
+				SELECT cl.id, cl.entity_type, cl.entity_id, cl.action, cl.field, cl.old_value, cl.new_value,
+				       cl.changed_by, cl.changed_at, COALESCE(u.full_name, 'System') as changed_by_name
+				FROM command_changelog cl
+				LEFT JOIN users u ON cl.changed_by = u.id
+				WHERE cl.entity_type = $1 AND cl.entity_id = $2
+				ORDER BY cl.changed_at DESC
+				LIMIT 50
+			`, entityType, entityID)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(200)
+				w.Write([]byte("[]"))
+				return
+			}
+			defer rows.Close()
+			type entry struct {
+				ID          string  `json:"id"`
+				EntityType  string  `json:"entity_type"`
+				EntityID    string  `json:"entity_id"`
+				Action      string  `json:"action"`
+				Field       *string `json:"field"`
+				OldValue    *string `json:"old_value"`
+				NewValue    *string `json:"new_value"`
+				ChangedBy   *string `json:"changed_by"`
+				ChangedAt   string  `json:"changed_at"`
+				ChangedName string  `json:"changed_by_name"`
+			}
+			var entries []entry
+			for rows.Next() {
+				var e entry
+				rows.Scan(&e.ID, &e.EntityType, &e.EntityID, &e.Action, &e.Field, &e.OldValue, &e.NewValue, &e.ChangedBy, &e.ChangedAt, &e.ChangedName)
+				entries = append(entries, e)
+			}
+			if entries == nil {
+				entries = []entry{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(entries)
+		})
 
 		// Board
 		r.Get("/api/v1/board", boardHandler.GetBoard)

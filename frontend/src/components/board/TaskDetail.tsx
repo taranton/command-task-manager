@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { FiX, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRight } from 'react-icons/fi';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FiX, FiPlus, FiMessageCircle, FiEdit2, FiTrash2, FiSend, FiChevronsRight, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { useTask, useUpdateTask, useDeleteTask } from '../../hooks/useBoardData';
@@ -490,6 +490,45 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
                     />
                   </MetaValue>
                 </MetaItem>
+
+                {/* Start Date */}
+                <MetaItem>
+                  <MetaLabel>Start Date</MetaLabel>
+                  <MetaValue>
+                    <input type="date"
+                      value={task.start_date ? task.start_date.split('T')[0] : ''}
+                      onChange={(e) => saveField('start_date', e.target.value || null)}
+                      style={{ padding: '4px 8px', border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.sm, fontSize: theme.typography.fontSize.sm, cursor: 'pointer' }}
+                    />
+                  </MetaValue>
+                </MetaItem>
+
+                {/* Estimated Hours */}
+                <MetaItem>
+                  <MetaLabel>Estimated Hours</MetaLabel>
+                  <MetaValue>
+                    <input type="number" step="0.5" min="0"
+                      value={task.estimated_hours || ''}
+                      onChange={(e) => saveField('estimated_hours', e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="—"
+                      style={{ padding: '4px 8px', border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.sm, fontSize: theme.typography.fontSize.sm, width: '80px' }}
+                    />
+                  </MetaValue>
+                </MetaItem>
+
+                {/* Story selector */}
+                <MetaItem>
+                  <MetaLabel>Story</MetaLabel>
+                  <MetaValue>
+                    <InlineSelect
+                      value={task.story_id || ''}
+                      onChange={(e) => saveField('story_id', e.target.value)}
+                    >
+                      {/* Stories will be passed via context or fetched */}
+                      <option value={task.story_id}>{task.story_title || 'Current Story'}</option>
+                    </InlineSelect>
+                  </MetaValue>
+                </MetaItem>
               </MetaGrid>
 
               {task.story_title && (
@@ -620,6 +659,10 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
               <Separator />
               <CommentsSection taskId={taskId} />
 
+              {/* Change Log */}
+              <Separator />
+              <ChangeLogSection entityType="task" entityId={taskId} />
+
               {/* Delete action */}
               <Separator />
               <DeleteBtn onClick={handleDelete}>
@@ -650,6 +693,71 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
     <Overlay onClick={(e) => e.target === e.currentTarget && onClose()}>
       <OverlayPanel>{panelContent(true)}</OverlayPanel>
     </Overlay>
+  );
+}
+
+// ---- Change Log Section ----
+const ChangeLogWrap = styled.div`margin-top: ${theme.spacing.sm};`;
+const ChangeLogToggle = styled.button`
+  display: flex; align-items: center; gap: 6px; background: none;
+  font-size: ${theme.typography.fontSize.sm}; color: ${theme.colors.cadetGray};
+  font-weight: ${theme.typography.fontWeight.medium};
+  &:hover { color: ${theme.colors.charcoal}; }
+  svg { width: 14px; height: 14px; }
+`;
+const LogList = styled.div`
+  margin-top: ${theme.spacing.sm}; display: flex; flex-direction: column; gap: 6px;
+  max-height: 200px; overflow-y: auto;
+`;
+const LogItem = styled.div`
+  font-size: 11px; color: ${theme.colors.cadetGray}; display: flex; gap: 6px;
+  padding: 4px 0; border-bottom: 1px solid ${theme.colors.border};
+`;
+const LogAction = styled.span`font-weight: 500; color: ${theme.colors.davysGray};`;
+
+function ChangeLogSection({ entityType, entityId }: { entityType: string; entityId: string }) {
+  const [open, setOpen] = useState(false);
+  const { data: logs } = useQuery<Array<{
+    id: string; action: string; field?: string; old_value?: string; new_value?: string;
+    changed_by_name: string; changed_at: string;
+  }>>({
+    queryKey: ['changelog', entityType, entityId],
+    queryFn: () => api.get(`/api/v1/${entityType}/${entityId}/changelog`),
+    enabled: open,
+  });
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+      d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <ChangeLogWrap>
+      <ChangeLogToggle onClick={() => setOpen(!open)}>
+        {open ? <FiChevronDown /> : <FiChevronRight />}
+        Change Log {logs && logs.length > 0 && `(${logs.length})`}
+      </ChangeLogToggle>
+      {open && (
+        <LogList>
+          {logs && logs.length > 0 ? logs.map((l) => (
+            <LogItem key={l.id}>
+              <span>{formatTime(l.changed_at)}</span>
+              <LogAction>
+                {l.action === 'status_changed' ? `Status: ${l.old_value} → ${l.new_value}` :
+                 l.action === 'created' ? 'Created' :
+                 l.action === 'deleted' ? 'Deleted' :
+                 l.action === 'reassigned' ? `Reassigned` :
+                 `${l.field}: ${l.old_value || '—'} → ${l.new_value || '—'}`}
+              </LogAction>
+              <span>by {l.changed_by_name}</span>
+            </LogItem>
+          )) : (
+            <div style={{ fontSize: '12px', color: theme.colors.cadetGray }}>No changes recorded</div>
+          )}
+        </LogList>
+      )}
+    </ChangeLogWrap>
   );
 }
 

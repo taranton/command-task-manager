@@ -145,16 +145,26 @@ const Button = styled.button<{ $primary?: boolean }>`
   `}
 `;
 
+interface StoryOption {
+  id: string;
+  title: string;
+}
+
 interface CreateTaskModalProps {
   storyId: string;
   storyTitle: string;
+  stories?: StoryOption[];
+  onStoryChange?: (storyId: string) => void;
   onClose: () => void;
   onSubmit: (input: CreateTaskInput, subtaskTitles: string[]) => void;
   isLoading: boolean;
 }
 
 export function CreateTaskModal({
+  storyId,
   storyTitle,
+  stories,
+  onStoryChange,
   onClose,
   onSubmit,
   isLoading,
@@ -203,9 +213,20 @@ export function CreateTaskModal({
           </ModalHeader>
 
           <ModalBody>
-            <div style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.cadetGray }}>
-              Story: {storyTitle}
-            </div>
+            <FormGroup>
+              <Label>Story</Label>
+              {stories && stories.length > 0 && onStoryChange ? (
+                <Select value={storyId} onChange={(e) => onStoryChange(e.target.value)}>
+                  {stories.map((s) => (
+                    <option key={s.id} value={s.id}>{s.title}</option>
+                  ))}
+                </Select>
+              ) : (
+                <div style={{ fontSize: theme.typography.fontSize.sm, color: theme.colors.davysGray }}>
+                  {storyTitle}
+                </div>
+              )}
+            </FormGroup>
 
             <FormGroup>
               <Label>Title *</Label>
