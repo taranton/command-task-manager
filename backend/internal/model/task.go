@@ -84,6 +84,7 @@ type UpdateTaskInput struct {
 	Status         *TaskStatus `json:"status,omitempty"`
 	Priority       *Priority   `json:"priority,omitempty"`
 	AssigneeID     *uuid.UUID  `json:"assignee_id,omitempty"`
+	StoryID        *uuid.UUID  `json:"story_id,omitempty"`
 	StartDate      *string     `json:"start_date,omitempty"`
 	Deadline       *string     `json:"deadline,omitempty"`
 	EstimatedHours *float64    `json:"estimated_hours,omitempty"`

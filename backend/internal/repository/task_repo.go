@@ -219,6 +219,11 @@ func (r *TaskRepository) Update(ctx context.Context, id uuid.UUID, input model.U
 		args = append(args, *input.EstimatedHours)
 		argIdx++
 	}
+	if input.StoryID != nil {
+		sets = append(sets, fmt.Sprintf("story_id = $%d", argIdx))
+		args = append(args, *input.StoryID)
+		argIdx++
+	}
 
 	if len(sets) == 0 {
 		return r.GetByID(ctx, id)
