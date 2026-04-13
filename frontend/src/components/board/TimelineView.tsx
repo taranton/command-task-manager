@@ -179,6 +179,7 @@ export function TimelineView({ stories, allTasks }: Props) {
         <RangeLabel>{fmtWeek(viewStart)}</RangeLabel>
       </Toolbar>
 
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       <ScrollArea>
         <Table>
           {/* ---- Left: names ---- */}
@@ -263,6 +264,7 @@ export function TimelineView({ stories, allTasks }: Props) {
       {selectedTaskId && (
         <TaskDetail taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} inline={!isMobile} />
       )}
+      </div>
     </Wrap>
   );
 }
