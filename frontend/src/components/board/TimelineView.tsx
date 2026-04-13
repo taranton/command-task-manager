@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
+import { Avatar } from '../ui/Avatar';
 import { TaskDetail } from './TaskDetail';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { Story, Task } from '../../types';
@@ -94,11 +95,7 @@ const DayCell = styled.div<{ $isToday: boolean; $isWeekend: boolean }>`
   border-right: 1px solid ${theme.colors.border}08;
 `;
 
-// Story row in left panel
-const StoryRow = styled.div`
-  padding: 12px 14px; border-bottom: 1px solid ${theme.colors.border};
-  min-height: 60px; display: flex; flex-direction: column; justify-content: center;
-`;
+// Story elements
 const StoryName = styled.div<{ $color: string }>`
   display: flex; align-items: center; gap: 8px;
   font-size: ${theme.typography.fontSize.sm}; font-weight: ${theme.typography.fontWeight.semibold};
@@ -117,15 +114,18 @@ const ProgressFill = styled.div<{ $pct: number; $color: string }>`
   height: 100%; width: ${(p) => p.$pct}%;
   background: ${(p) => p.$color}; border-radius: 2px;
 `;
-const UnscheduledLabel = styled.div`
-  font-size: 10px; color: ${theme.colors.cadetGray}; margin-top: 4px;
-`;
 
 // Task bars in right panel
 const BarRow = styled.div<{ $cols: number }>`
   display: grid; grid-template-columns: repeat(${(p) => p.$cols}, 36px);
-  min-height: 60px; border-bottom: 1px solid ${theme.colors.border};
+  height: 34px; border-bottom: 1px solid ${theme.colors.border};
   align-items: center; position: relative;
+`;
+const StoryHeaderSpacer = styled.div<{ $color: string }>`
+  height: auto; min-height: 50px;
+  border-bottom: 1px solid ${theme.colors.border};
+  background: ${(p) => p.$color}08;
+  border-left: 3px solid ${(p) => p.$color};
 `;
 const TaskBar = styled.div<{ $start: number; $span: number; $color: string; $progress: number }>`
   grid-column: ${(p) => p.$start} / span ${(p) => Math.max(p.$span, 4)};
@@ -245,17 +245,38 @@ export function TimelineView({ stories, allTasks }: TimelineViewProps) {
         <LeftPanel>
           {/* Spacer for header */}
           <div style={{ height: 44, borderBottom: `1px solid ${theme.colors.border}` }} />
-          {storyData.map(({ story, unscheduled, color }) => (
-            <StoryRow key={story.id}>
-              <StoryName $color={color}>
-                <StoryDot $color={color}>{story.title.charAt(0).toUpperCase()}</StoryDot>
-                {story.title}
-              </StoryName>
-              <ProgressMini>
-                <ProgressFill $pct={story.progress} $color={color} />
-              </ProgressMini>
-              {unscheduled > 0 && <UnscheduledLabel>{unscheduled} unscheduled</UnscheduledLabel>}
-            </StoryRow>
+          {storyData.map(({ story, tasks, unscheduled, color }) => (
+            <div key={story.id}>
+              {/* Story header — spans visually, not a task row */}
+              <div style={{
+                padding: '8px 14px', background: `${color}10`,
+                borderBottom: `1px solid ${theme.colors.border}`, borderLeft: `3px solid ${color}`,
+              }}>
+                <StoryName $color={color}>
+                  <StoryDot $color={color}>{story.title.charAt(0).toUpperCase()}</StoryDot>
+                  {story.title}
+                </StoryName>
+                <ProgressMini>
+                  <ProgressFill $pct={story.progress} $color={color} />
+                </ProgressMini>
+                <div style={{ fontSize: '10px', color: theme.colors.cadetGray, marginTop: '2px' }}>
+                  {tasks.length} tasks{unscheduled > 0 ? ` · ${unscheduled} unscheduled` : ''}
+                </div>
+              </div>
+              {/* Individual task rows */}
+              {tasks.map((task) => (
+                <div key={task.id} style={{
+                  height: 34, display: 'flex', alignItems: 'center',
+                  padding: '0 14px 0 32px', borderBottom: `1px solid ${theme.colors.border}`,
+                  fontSize: '12px', color: theme.colors.davysGray,
+                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                  cursor: 'pointer',
+                }} onClick={() => setSelectedTaskId(task.id)}>
+                  {task.assignee && <Avatar name={task.assignee.full_name} url={task.assignee.avatar_url} size={18} />}
+                  <span style={{ marginLeft: '6px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</span>
+                </div>
+              ))}
+            </div>
           ))}
         </LeftPanel>
 
@@ -276,40 +297,46 @@ export function TimelineView({ stories, allTasks }: TimelineViewProps) {
             </TimeHeader>
           </div>
 
-          {/* Task bars */}
+          {/* Task bars — each task gets its own row */}
           {storyData.map(({ story, tasks, color }) => (
-            <BarRow key={story.id} $cols={totalDays}>
+            <div key={story.id}>
+              {/* Story header spacer on right side — matches left panel */}
+              <StoryHeaderSpacer $color={color} />
               {tasks.map((task) => {
                 const start = parseDate(task.start_date) || parseDate(task.deadline);
                 const end = parseDate(task.deadline) || (start ? addDays(start, 7) : null);
-                if (!start || !end) return null;
 
-                const startCol = Math.max(daysBetween(viewStart, start) + 1, 1);
-                const endCol = Math.min(daysBetween(viewStart, end) + 1, totalDays);
+                const startCol = start ? Math.max(daysBetween(viewStart, start) + 1, 1) : 1;
+                const endCol = end ? Math.min(daysBetween(viewStart, end) + 1, totalDays) : 1;
                 const span = Math.max(endCol - startCol + 1, 1);
-
-                if (startCol > totalDays || endCol < 1) return null;
-
+                const isVisible = start && end && startCol <= totalDays && endCol >= 1;
                 const progress = task.progress || 0;
 
                 return (
-                  <TaskBar
-                    key={task.id}
-                    $start={Math.max(startCol, 1)}
-                    $span={span}
-                    $color={color}
-                    $progress={progress}
-                    onClick={() => setSelectedTaskId(task.id)}
-                    title={`${task.title}\n${task.start_date || '?'} → ${task.deadline || '?'}\nProgress: ${progress}%`}
-                  >
-                    <TaskBarText $filled={progress > 40}>
-                      {task.title}
-                      {task.estimated_hours && <TaskHours>{task.estimated_hours}h</TaskHours>}
-                    </TaskBarText>
-                  </TaskBar>
+                  <BarRow key={task.id} $cols={totalDays}>
+                    {isVisible ? (
+                      <TaskBar
+                        $start={Math.max(startCol, 1)}
+                        $span={span}
+                        $color={color}
+                        $progress={progress}
+                        onClick={() => setSelectedTaskId(task.id)}
+                        title={`${task.title}\n${task.start_date || '?'} → ${task.deadline || '?'}\nProgress: ${progress}%`}
+                      >
+                        <TaskBarText $filled={progress > 40}>
+                          {task.title}
+                          {task.estimated_hours && <TaskHours>{task.estimated_hours}h</TaskHours>}
+                        </TaskBarText>
+                      </TaskBar>
+                    ) : (
+                      <div style={{ gridColumn: '1 / span 4', padding: '4px 8px', fontSize: '11px', color: theme.colors.cadetGray, fontStyle: 'italic' }}>
+                        {task.title} — no dates
+                      </div>
+                    )}
+                  </BarRow>
                 );
               })}
-            </BarRow>
+            </div>
           ))}
 
           {/* Today line */}
