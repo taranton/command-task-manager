@@ -127,18 +127,42 @@ const BarRow = styled.div<{ $cols: number }>`
   min-height: 60px; border-bottom: 1px solid ${theme.colors.border};
   align-items: center; position: relative;
 `;
-const TaskBar = styled.div<{ $start: number; $span: number; $color: string }>`
+const TaskBar = styled.div<{ $start: number; $span: number; $color: string; $progress: number }>`
   grid-column: ${(p) => p.$start} / span ${(p) => Math.max(p.$span, 1)};
-  background: ${(p) => p.$color};
-  color: white; font-size: 11px; font-weight: 500;
-  padding: 4px 8px; border-radius: 4px;
-  white-space: nowrap; overflow: visible;
-  cursor: pointer; min-height: 26px; display: flex; align-items: center; gap: 6px;
-  margin: 2px 0; min-width: 120px; position: relative; z-index: 2;
-  &:hover { opacity: 0.9; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 3; }
+  background: ${(p) => p.$color}30;
+  color: ${(p) => p.$color};
+  font-size: 12px; font-weight: 600;
+  padding: 0; border-radius: 14px;
+  white-space: nowrap; overflow: hidden;
+  cursor: pointer; height: 28px; display: flex; align-items: center;
+  margin: 2px 0; position: relative; z-index: 2;
+  border: 1.5px solid ${(p) => p.$color}40;
+
+  /* Progress fill from left */
+  &::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: ${(p) => p.$progress}%;
+    background: ${(p) => p.$color};
+    border-radius: 14px 0 0 14px;
+    ${(p) => p.$progress >= 100 ? 'border-radius: 14px;' : ''}
+    transition: width 0.3s ease;
+  }
+
+  &:hover {
+    box-shadow: 0 2px 8px ${(p) => p.$color}40;
+    z-index: 3;
+  }
+`;
+const TaskBarText = styled.span<{ $filled: boolean }>`
+  position: relative; z-index: 1;
+  padding: 0 10px;
+  color: ${(p) => p.$filled ? 'white' : 'inherit'};
+  display: flex; align-items: center; gap: 6px;
+  overflow: hidden; text-overflow: ellipsis;
 `;
 const TaskHours = styled.span`
-  font-size: 9px; background: rgba(255,255,255,0.25);
+  font-size: 9px; background: rgba(0,0,0,0.1);
   padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
 `;
 
@@ -266,17 +290,22 @@ export function TimelineView({ stories, allTasks }: TimelineViewProps) {
 
                 if (startCol > totalDays || endCol < 1) return null;
 
+                const progress = task.progress || 0;
+
                 return (
                   <TaskBar
                     key={task.id}
                     $start={Math.max(startCol, 1)}
                     $span={span}
                     $color={color}
+                    $progress={progress}
                     onClick={() => setSelectedTaskId(task.id)}
-                    title={`${task.title}\n${task.start_date || '?'} → ${task.deadline || '?'}`}
+                    title={`${task.title}\n${task.start_date || '?'} → ${task.deadline || '?'}\nProgress: ${progress}%`}
                   >
-                    {task.title}
-                    {task.estimated_hours && <TaskHours>{task.estimated_hours}h</TaskHours>}
+                    <TaskBarText $filled={progress > 40}>
+                      {task.title}
+                      {task.estimated_hours && <TaskHours>{task.estimated_hours}h</TaskHours>}
+                    </TaskBarText>
                   </TaskBar>
                 );
               })}
