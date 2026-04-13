@@ -132,10 +132,10 @@ const TaskBar = styled.div<{ $start: number; $span: number; $color: string }>`
   background: ${(p) => p.$color};
   color: white; font-size: 11px; font-weight: 500;
   padding: 4px 8px; border-radius: 4px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: visible;
   cursor: pointer; min-height: 26px; display: flex; align-items: center; gap: 6px;
-  margin: 2px 0;
-  &:hover { opacity: 0.9; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+  margin: 2px 0; min-width: 120px; position: relative; z-index: 2;
+  &:hover { opacity: 0.9; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 3; }
 `;
 const TaskHours = styled.span`
   font-size: 9px; background: rgba(255,255,255,0.25);
@@ -257,7 +257,7 @@ export function TimelineView({ stories, allTasks }: TimelineViewProps) {
             <BarRow key={story.id} $cols={totalDays}>
               {tasks.map((task) => {
                 const start = parseDate(task.start_date) || parseDate(task.deadline);
-                const end = parseDate(task.deadline) || (start ? addDays(start, 3) : null);
+                const end = parseDate(task.deadline) || (start ? addDays(start, 7) : null);
                 if (!start || !end) return null;
 
                 const startCol = Math.max(daysBetween(viewStart, start) + 1, 1);
