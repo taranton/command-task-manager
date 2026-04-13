@@ -1,9 +1,10 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useState, useEffect } from 'react';
 import styled, { css } from 'styled-components';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FiCalendar, FiCheckSquare, FiChevronDown, FiChevronRight } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
+import { api } from '../../lib/api';
 import { Avatar } from '../ui/Avatar';
 import type { Task, Priority, Subtask } from '../../types';
 import { PRIORITY_LABELS } from '../../types';
@@ -115,11 +116,20 @@ interface TaskCardProps {
 export const TaskCardComponent = forwardRef<HTMLDivElement, TaskCardProps & { isDragging?: boolean; isOverlay?: boolean; style?: React.CSSProperties }>(
   ({ task, onClick, hideStoryMarker = false, isDragging = false, isOverlay = false, style }, ref) => {
     const [showSubtasks, setShowSubtasks] = useState(false);
+    const [loadedSubtasks, setLoadedSubtasks] = useState<Subtask[]>([]);
     const subtaskPct = task.subtask_count > 0 ? Math.round((task.subtask_done / task.subtask_count) * 100) : 0;
     const isDone = task.status === 'done';
     const deadlineOver = task.deadline ? isOverdue(task.deadline) : false;
     const deadlineSoonV = task.deadline ? isSoon(task.deadline) : false;
-    const subtasks: Subtask[] = task.subtasks || [];
+
+    // Fetch subtasks on demand
+    useEffect(() => {
+      if (showSubtasks && loadedSubtasks.length === 0 && task.subtask_count > 0) {
+        api.get<Subtask[]>(`/api/v1/tasks/${task.id}/subtasks`).then(setLoadedSubtasks).catch(() => {});
+      }
+    }, [showSubtasks, task.id, task.subtask_count, loadedSubtasks.length]);
+
+    const subtasks = task.subtasks?.length ? task.subtasks : loadedSubtasks;
 
     return (
       <Card ref={ref} style={style} $isDragging={isDragging} $isOverlay={isOverlay} $isDone={isDone}
@@ -164,11 +174,13 @@ export const TaskCardComponent = forwardRef<HTMLDivElement, TaskCardProps & { is
             {showSubtasks ? 'Hide subtasks' : 'Show subtasks'}
           </ExpandBtn>
         )}
-        {showSubtasks && subtasks.length > 0 && (
+        {showSubtasks && (
           <SubtaskList onClick={(e) => e.stopPropagation()}>
-            {subtasks.map((s) => (
+            {subtasks.length > 0 ? subtasks.map((s) => (
               <SubtaskRow key={s.id} $done={s.status === 'done'}>{s.title}</SubtaskRow>
-            ))}
+            )) : (
+              <SubtaskRow $done={false} style={{ color: theme.colors.cadetGray, fontStyle: 'italic' }}>Loading...</SubtaskRow>
+            )}
           </SubtaskList>
         )}
       </Card>

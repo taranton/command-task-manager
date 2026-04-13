@@ -165,19 +165,24 @@ export function KanbanColumn({ status, tasks, stories, swimLanes = false, onTask
         <CardList>
           {tasks.length > 0 ? (
             swimLanes && groupedTasks ? (
-              groupedTasks.map((group) => (
-                <div key={group.story?.id || 'none'}>
-                  {group.story && (
-                    <SwimLaneHeader $color={storyColor(group.story.title)}>
+              // Flat list with headers injected between groups (no wrapper divs)
+              groupedTasks.flatMap((group) => {
+                const items: React.ReactNode[] = [];
+                if (group.story) {
+                  items.push(
+                    <SwimLaneHeader key={`lane-${group.story.id}`} $color={storyColor(group.story.title)}>
                       {group.story.title}
                       <SwimProgress>{group.story.progress}%</SwimProgress>
                     </SwimLaneHeader>
-                  )}
-                  {group.tasks.map((task) => (
+                  );
+                }
+                group.tasks.forEach((task) => {
+                  items.push(
                     <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} hideStoryMarker />
-                  ))}
-                </div>
-              ))
+                  );
+                });
+                return items;
+              })
             ) : (
               tasks.map((task) => (
                 <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} />
