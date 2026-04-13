@@ -146,7 +146,6 @@ export default function BoardPage() {
   const [filter, setFilter] = useState<BoardFilter>({});
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
-  const [swimLanes, setSwimLanes] = useState(true);
   const [createTaskStoryId, setCreateTaskStoryId] = useState<string>('');
   const [openDrop, setOpenDrop] = useState<string | null>(null);
 
@@ -303,14 +302,6 @@ export default function BoardPage() {
           )}
         </ChipWrap>
 
-        {/* Active count + clear */}
-        {/* Swim lanes toggle */}
-        {viewMode === 'kanban' && (
-          <Chip $active={swimLanes} onClick={() => setSwimLanes(!swimLanes)}>
-            Swim Lanes
-          </Chip>
-        )}
-
         {activeFilterCount > 0 && (
           <ActiveFilters>
             <ClearBtn onClick={clearFilters}>Clear all ({activeFilterCount})</ClearBtn>
@@ -322,7 +313,7 @@ export default function BoardPage() {
       {isLoading || !board ? (
         <CenterMsg>Loading board...</CenterMsg>
       ) : viewMode === 'kanban' ? (
-        <KanbanBoard board={board} stories={stories.map(s => ({ id: s.id, title: s.title, progress: s.progress }))} swimLanes={swimLanes} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
+        <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
       ) : (
         <BacklogTable
           stories={stories}

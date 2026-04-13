@@ -80,8 +80,6 @@ const measuring = {
 // ---- Component ----
 interface KanbanBoardProps {
   board: Board;
-  stories?: Array<{ id: string; title: string; progress: number }>;
-  swimLanes?: boolean;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onPositionChange: (taskId: string, sortOrder: number, columnStatus: TaskStatus, reorderedTasks: Task[]) => void;
   onQuickAdd?: (status: TaskStatus) => void;
