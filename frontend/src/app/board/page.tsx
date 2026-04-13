@@ -5,6 +5,7 @@ import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { KanbanBoard } from '../../components/board/KanbanBoard';
 import { BacklogTable } from '../../components/board/BacklogTable';
+import { TimelineView } from '../../components/board/TimelineView';
 import { CreateTaskModal } from '../../components/forms/CreateTask';
 import { CreateStoryModal } from '../../components/forms/CreateStory';
 import { Avatar } from '../../components/ui/Avatar';
@@ -142,7 +143,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function BoardPage() {
   const isMobile = useIsMobile();
   const { user: me } = useAuth();
-  const [viewMode, setViewMode] = useState<'kanban' | 'backlog'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'backlog' | 'timeline'>('kanban');
   const [filter, setFilter] = useState<BoardFilter>({});
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
@@ -189,6 +190,7 @@ export default function BoardPage() {
           <ViewSwitcher>
             <ViewBtn $active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')}>Kanban</ViewBtn>
             <ViewBtn $active={viewMode === 'backlog'} onClick={() => setViewMode('backlog')}>Backlog</ViewBtn>
+            <ViewBtn $active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')}>Timeline</ViewBtn>
           </ViewSwitcher>
         </HeaderLeft>
         {!isMobile && (
@@ -314,8 +316,13 @@ export default function BoardPage() {
         <CenterMsg>Loading board...</CenterMsg>
       ) : viewMode === 'kanban' ? (
         <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
-      ) : (
+      ) : viewMode === 'backlog' ? (
         <BacklogTable
+          stories={stories}
+          allTasks={board.columns.flatMap((c) => c.tasks)}
+        />
+      ) : (
+        <TimelineView
           stories={stories}
           allTasks={board.columns.flatMap((c) => c.tasks)}
         />
