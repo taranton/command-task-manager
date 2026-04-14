@@ -229,7 +229,7 @@ function AddMemberSearch({ users, teams, currentMembers, onAdd }: {
                 </AddRowMeta>
               </AddRowInfo>
               <Btn $primary $small onClick={() => onAdd(u.id)}>
-                {fromTeam ? 'Transfer' : 'Add'}
+                +
               </Btn>
             </AddRow>
           );

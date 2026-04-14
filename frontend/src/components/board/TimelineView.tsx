@@ -55,13 +55,13 @@ const HeaderCell = styled.div`
   display: flex; align-items: center; border-bottom: 1px solid ${theme.colors.border};
 `;
 const NameHeader = styled(HeaderCell)`padding: 0 14px; height: 44px;`;
-const WeekLabel = styled.div<{ $w: number }>`
-  width: ${(p) => p.$w * 36}px; padding: 0 6px; border-right: 1px solid ${theme.colors.border};
+const WeekLabel = styled.div<{ $w: number; $cw?: number }>`
+  width: ${(p) => p.$w * (p.$cw || 36)}px; padding: 0 6px; border-right: 1px solid ${theme.colors.border};
   display: flex; align-items: center; height: 22px; font-size: 10px; color: ${theme.colors.cadetGray};
   font-weight: 600; white-space: nowrap; overflow: hidden;
 `;
 const DayLabel = styled.div<{ $today: boolean; $weekend: boolean }>`
-  width: 36px; text-align: center; height: 22px; display: flex; align-items: center; justify-content: center;
+  width: var(--cw, 36px); text-align: center; height: 22px; display: flex; align-items: center; justify-content: center;
   font-size: 10px; border-right: 1px solid ${theme.colors.border}10;
   color: ${(p) => p.$today ? theme.colors.vividOrange : p.$weekend ? theme.colors.silver : theme.colors.cadetGray};
   font-weight: ${(p) => p.$today ? '700' : '400'};
@@ -101,8 +101,8 @@ const TaskTitle = styled.span`
 `;
 
 // Bars
-const BarArea = styled.div<{ $days: number }>`
-  position: relative; width: ${(p) => p.$days * 36}px; height: ${ROW_H}px;
+const BarArea = styled.div<{ $days: number; $cw?: number }>`
+  position: relative; width: ${(p) => p.$days * (p.$cw || 36)}px; height: ${ROW_H}px;
 `;
 const Bar = styled.div<{ $left: number; $width: number; $color: string; $progress: number }>`
   position: absolute; top: 6px; height: ${ROW_H - 12}px;
@@ -136,13 +136,21 @@ const TodayLine = styled.div<{ $x: number }>`
 // ---- Component ----
 interface Props { stories: Story[]; allTasks: Task[]; }
 
+type Scale = 'days' | 'weeks' | 'months';
+const SCALE_CONFIG: Record<Scale, { cellWidth: number; totalDays: number; label: string }> = {
+  days: { cellWidth: 36, totalDays: 42, label: 'Days' },
+  weeks: { cellWidth: 18, totalDays: 90, label: 'Weeks' },
+  months: { cellWidth: 8, totalDays: 180, label: 'Months' },
+};
+
 export function TimelineView({ stories, allTasks }: Props) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [scale, setScale] = useState<Scale>('days');
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [viewStart, setViewStart] = useState(() => startOfWeek(addDays(today, -7)));
-  const totalDays = 42; // 6 weeks
+  const { cellWidth, totalDays } = SCALE_CONFIG[scale];
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(stories.map((s) => s.id)));
 
   const days = useMemo(() => Array.from({ length: totalDays }, (_, i) => addDays(viewStart, i)), [viewStart, totalDays]);
@@ -175,24 +183,32 @@ export function TimelineView({ stories, allTasks }: Props) {
     return { story, tasks, color: getColor(idx), minDate, maxDate, storyDeadline, hasOvertime };
   }), [stories, allTasks]);
 
-  const todayX = daysBetween(viewStart, today) * 36 + 18;
+  const todayX = daysBetween(viewStart, today) * cellWidth + cellWidth / 2;
   const toggle = (id: string) => setExpanded((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const calcBar = (start: Date | null, end: Date | null) => {
     if (!start || !end) return null;
-    const l = daysBetween(viewStart, start) * 36;
-    const w = Math.max((daysBetween(start, end) + 1) * 36, 36);
-    if (l + w < 0 || l > totalDays * 36) return null;
+    const l = daysBetween(viewStart, start) * cellWidth;
+    const w = Math.max((daysBetween(start, end) + 1) * cellWidth, cellWidth * 3);
+    if (l + w < 0 || l > totalDays * cellWidth) return null;
     return { left: l, width: w };
   };
 
   return (
     <Wrap>
       <Toolbar>
-        <NavBtn onClick={() => setViewStart(addDays(viewStart, -7))}><FiChevronLeft /></NavBtn>
-        <NavBtn onClick={() => setViewStart(addDays(viewStart, 7))}><FiChevronRight /></NavBtn>
-        <TodayBtn onClick={() => setViewStart(startOfWeek(addDays(today, -7)))}>Today</TodayBtn>
+        <NavBtn onClick={() => setViewStart(addDays(viewStart, scale === 'months' ? -30 : scale === 'weeks' ? -14 : -7))}><FiChevronLeft /></NavBtn>
+        <NavBtn onClick={() => setViewStart(addDays(viewStart, scale === 'months' ? 30 : scale === 'weeks' ? 14 : 7))}><FiChevronRight /></NavBtn>
+        <TodayBtn onClick={() => setViewStart(startOfWeek(addDays(today, -3)))}>Today</TodayBtn>
         <RangeLabel>{fmtWeek(viewStart)}</RangeLabel>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px', background: theme.colors.lightGray, borderRadius: '6px', padding: '2px' }}>
+          {(['days', 'weeks', 'months'] as Scale[]).map((s) => (
+            <TodayBtn key={s} onClick={() => setScale(s)}
+              style={{ background: scale === s ? 'white' : 'transparent', boxShadow: scale === s ? '0 1px 2px rgba(0,0,0,0.1)' : 'none' }}>
+              {SCALE_CONFIG[s].label}
+            </TodayBtn>
+          ))}
+        </div>
       </Toolbar>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -200,7 +216,7 @@ export function TimelineView({ stories, allTasks }: Props) {
         <Table>
           {/* ---- Left: names ---- */}
           <NameCol>
-            <NameHeader>Task</NameHeader>
+            <NameHeader style={{ position: 'sticky', top: 0, zIndex: 6, background: 'white' }}>Task</NameHeader>
             {storyData.map(({ story, tasks, color }) => (
               <div key={story.id}>
                 <StoryNameRow onClick={() => { setSelectedStoryId(story.id); setSelectedTaskId(null); }}>
@@ -221,18 +237,21 @@ export function TimelineView({ stories, allTasks }: Props) {
 
           {/* ---- Right: timeline ---- */}
           <TimeCol>
-            {/* Week headers */}
-            <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}` }}>
-              {weeks.map((w, i) => <WeekLabel key={i} $w={w.days}>{fmtWeek(w.start)}</WeekLabel>)}
-            </div>
-            {/* Day numbers */}
-            <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}` }}>
+            {/* Sticky time header */}
+            <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'white' }}>
+              {/* Week headers */}
+              <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}` }}>
+                {weeks.map((w, i) => <WeekLabel key={i} $w={w.days} $cw={cellWidth}>{fmtWeek(w.start)}</WeekLabel>)}
+              </div>
+              {/* Day numbers */}
+              <div style={{ display: 'flex', height: 22, borderBottom: `1px solid ${theme.colors.border}`, ['--cw' as string]: `${cellWidth}px` }}>
               {days.map((d, i) => (
                 <DayLabel key={i} $today={d.getTime() === today.getTime()} $weekend={d.getDay() === 0 || d.getDay() === 6}>
                   {d.getDate()}
                 </DayLabel>
               ))}
             </div>
+            </div>{/* end sticky header */}
 
             {/* Bars */}
             {storyData.map(({ story, tasks, color, minDate, maxDate, storyDeadline, hasOvertime }) => {
@@ -242,7 +261,7 @@ export function TimelineView({ stories, allTasks }: Props) {
               return (
                 <div key={story.id} style={{ position: 'relative' }}>
                   {/* Story aggregate bar */}
-                  <BarArea $days={totalDays}>
+                  <BarArea $days={totalDays} $cw={cellWidth}>
                     {storyBar && (
                       <Bar $left={storyBar.left} $width={storyBar.width} $color={color} $progress={story.progress}
                         onClick={() => { setSelectedStoryId(story.id); setSelectedTaskId(null); }} style={{ cursor: 'pointer' }}>
@@ -252,7 +271,7 @@ export function TimelineView({ stories, allTasks }: Props) {
                     {overtimeBar && (
                       <OvertimeBar $left={overtimeBar.left} $width={overtimeBar.width} />
                     )}
-                    {todayX > 0 && todayX < totalDays * 36 && <TodayLine $x={todayX} />}
+                    {todayX > 0 && todayX < totalDays * cellWidth && <TodayLine $x={todayX} />}
                   </BarArea>
 
                   {/* Task bars */}
@@ -272,7 +291,7 @@ export function TimelineView({ stories, allTasks }: Props) {
                             no dates set
                           </div>
                         )}
-                        {todayX > 0 && todayX < totalDays * 36 && <TodayLine $x={todayX} />}
+                        {todayX > 0 && todayX < totalDays * cellWidth && <TodayLine $x={todayX} />}
                       </BarArea>
                     );
                   })}
