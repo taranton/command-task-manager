@@ -429,14 +429,15 @@ export default function AdminPage() {
                   </UserInfo>
                 </UserCell>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                  {teams?.filter((t) => t.id === u.team_id).map((t) => (
-                    <span key={t.id} style={{
+                  {u.boards && u.boards.length > 0 ? u.boards.map((b) => (
+                    <span key={b.id} style={{
                       fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
                       background: theme.colors.vividOrange + '15', color: theme.colors.vividOrange,
                       fontWeight: 500,
-                    }}>{t.name}</span>
-                  ))}
-                  {!u.team_id && <span style={{ fontSize: '11px', color: theme.colors.cadetGray }}>—</span>}
+                    }}>{b.name}</span>
+                  )) : (
+                    <span style={{ fontSize: '11px', color: theme.colors.cadetGray }}>—</span>
+                  )}
                 </div>
                 <div>
                   <Select value={u.region_id || ''} onChange={(e) => assignRegion.mutate({ userId: u.id, regionId: e.target.value || null })}>

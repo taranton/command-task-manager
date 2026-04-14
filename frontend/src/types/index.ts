@@ -20,6 +20,7 @@ export interface User {
   avatar_url?: string;
   team_id?: string;
   region_id?: string;
+  boards?: Array<{ id: string; name: string; role: string }>;
   is_active: boolean;
   approved?: boolean;
   created_at: string;

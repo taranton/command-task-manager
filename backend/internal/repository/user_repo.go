@@ -60,6 +60,7 @@ func (r *UserRepository) List(ctx context.Context) ([]model.User, error) {
 	defer rows.Close()
 
 	var users []model.User
+	userIndex := make(map[string]int)
 	for rows.Next() {
 		var u model.User
 		if err := rows.Scan(
@@ -68,9 +69,37 @@ func (r *UserRepository) List(ctx context.Context) ([]model.User, error) {
 		); err != nil {
 			return nil, err
 		}
+		userIndex[u.ID.String()] = len(users)
 		users = append(users, u)
 	}
-	return users, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Fetch board memberships in one query
+	bmRows, bmErr := r.db.Query(ctx, `
+		SELECT bm.user_id::text, t.id::text, t.name, bm.role
+		FROM board_members bm
+		INNER JOIN teams t ON bm.board_id = t.id
+		ORDER BY t.name
+	`)
+	if bmErr == nil {
+		defer bmRows.Close()
+		for bmRows.Next() {
+			var userID, boardID, boardName, role string
+			if err := bmRows.Scan(&userID, &boardID, &boardName, &role); err == nil {
+				if idx, ok := userIndex[userID]; ok {
+					users[idx].Boards = append(users[idx].Boards, model.UserBoard{
+						ID:   uuid.MustParse(boardID),
+						Name: boardName,
+						Role: role,
+					})
+				}
+			}
+		}
+	}
+
+	return users, nil
 }
 
 func (r *UserRepository) Create(ctx context.Context, email, fullName, passwordHash string) (*model.User, error) {
