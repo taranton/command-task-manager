@@ -41,12 +41,12 @@ const TodayBtn = styled.button`
 const RangeLabel = styled.span`font-size: 13px; font-weight: 500; color: ${theme.colors.charcoal};`;
 
 const ScrollArea = styled.div`flex: 1; overflow: auto;`;
-const Table = styled.div`display: flex; min-width: fit-content;`;
+const Table = styled.div`display: flex; min-width: fit-content; min-height: 100%;`;
 const NameCol = styled.div`
   min-width: 260px; max-width: 260px; flex-shrink: 0; position: sticky; left: 0; z-index: 10;
-  background: ${theme.colors.white}; border-right: 1px solid ${theme.colors.border};
+  background: ${theme.colors.white}; border-right: 1px solid ${theme.colors.border}; min-height: 100%;
 `;
-const TimeCol = styled.div`flex: 1;`;
+const TimeCol = styled.div`flex: 1; min-height: 100%;`;
 
 // Header
 const HeaderCell = styled.div`
@@ -121,6 +121,12 @@ const BarText = styled.span<{ $filled: boolean }>`
   font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: ${(p) => p.$filled ? 'white' : 'inherit'};
 `;
+const OvertimeBar = styled.div<{ $left: number; $width: number }>`
+  position: absolute; top: 6px; height: ${ROW_H - 12}px;
+  left: ${(p) => p.$left}px; width: ${(p) => p.$width}px;
+  background: #F4433620; border: 1px dashed #F4433660; border-left: none;
+  border-radius: 0 4px 4px 0;
+`;
 const TodayLine = styled.div<{ $x: number }>`
   position: absolute; top: 0; bottom: 0; left: ${(p) => p.$x}px; width: 2px;
   background: ${theme.colors.error}; z-index: 5; pointer-events: none;
@@ -148,15 +154,23 @@ export function TimelineView({ stories, allTasks }: Props) {
 
   const storyData = useMemo(() => stories.map((story, idx) => {
     const tasks = allTasks.filter((t) => t.story_id === story.id);
-    // Story bar: earliest start → latest deadline
-    let minDate: Date | null = null, maxDate: Date | null = null;
+    // Task date range
+    let taskMinDate: Date | null = null, taskMaxDate: Date | null = null;
     for (const t of tasks) {
       const s = parseD(t.start_date) || parseD(t.deadline);
       const e = parseD(t.deadline) || s;
-      if (s && (!minDate || s < minDate)) minDate = s;
-      if (e && (!maxDate || e > maxDate)) maxDate = e;
+      if (s && (!taskMinDate || s < taskMinDate)) taskMinDate = s;
+      if (e && (!taskMaxDate || e > taskMaxDate)) taskMaxDate = e;
     }
-    return { story, tasks, color: getColor(idx), minDate, maxDate };
+    // Story's own dates
+    const storyStart = parseD(story.start_date) || taskMinDate;
+    const storyDeadline = parseD(story.deadline);
+    // Effective range: story dates OR task dates (whichever is wider)
+    const minDate = storyStart && taskMinDate ? (storyStart < taskMinDate ? storyStart : taskMinDate) : storyStart || taskMinDate;
+    const maxDate = taskMaxDate && storyDeadline ? (taskMaxDate > storyDeadline ? taskMaxDate : storyDeadline) : taskMaxDate || storyDeadline;
+    // Overtime: tasks extend beyond story deadline
+    const hasOvertime = storyDeadline && taskMaxDate && taskMaxDate > storyDeadline;
+    return { story, tasks, color: getColor(idx), minDate, maxDate, storyDeadline, hasOvertime };
   }), [stories, allTasks]);
 
   const todayX = daysBetween(viewStart, today) * 36 + 18;
@@ -219,16 +233,22 @@ export function TimelineView({ stories, allTasks }: Props) {
             </div>
 
             {/* Bars */}
-            {storyData.map(({ story, tasks, color, minDate, maxDate }) => {
+            {storyData.map(({ story, tasks, color, minDate, maxDate, storyDeadline, hasOvertime }) => {
               const storyBar = calcBar(minDate, maxDate);
+              // Overtime bar: from story deadline to task max date
+              const overtimeBar = hasOvertime && storyDeadline ? calcBar(storyDeadline, maxDate) : null;
               return (
                 <div key={story.id} style={{ position: 'relative' }}>
                   {/* Story aggregate bar */}
                   <BarArea $days={totalDays}>
                     {storyBar && (
-                      <Bar $left={storyBar.left} $width={storyBar.width} $color={color} $progress={story.progress}>
+                      <Bar $left={storyBar.left} $width={storyBar.width} $color={color} $progress={story.progress}
+                        onClick={() => toggle(story.id)} style={{ cursor: 'pointer' }}>
                         <BarText $filled={story.progress > 30}>{story.title} — {story.progress}%</BarText>
                       </Bar>
+                    )}
+                    {overtimeBar && (
+                      <OvertimeBar $left={overtimeBar.left} $width={overtimeBar.width} />
                     )}
                     {todayX > 0 && todayX < totalDays * 36 && <TodayLine $x={todayX} />}
                   </BarArea>
