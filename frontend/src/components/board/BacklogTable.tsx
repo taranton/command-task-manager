@@ -5,6 +5,7 @@ import { theme } from '../../styles/theme';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { TaskDetail } from './TaskDetail';
+import { StoryDetail } from './StoryDetail';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { Story, Task, Subtask } from '../../types';
 
@@ -239,11 +240,8 @@ export function BacklogTable({ stories, allTasks }: BacklogTableProps) {
   };
 
   const handleRowClick = (row: RowData) => {
-    if (row.type === 'task') {
-      setSelectedId(row.id);
-      setSelectedType('task');
-    }
-    // Stories and subtasks — could open detail in future
+    setSelectedId(row.id);
+    setSelectedType(row.type);
   };
 
   return (
@@ -322,6 +320,14 @@ export function BacklogTable({ stories, allTasks }: BacklogTableProps) {
         <TaskDetail
           taskId={selectedId}
           onClose={() => setSelectedId(null)}
+          inline={!isMobile}
+        />
+      )}
+      {selectedId && selectedType === 'story' && (
+        <StoryDetail
+          storyId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onTaskClick={(taskId) => { setSelectedId(taskId); setSelectedType('task'); }}
           inline={!isMobile}
         />
       )}

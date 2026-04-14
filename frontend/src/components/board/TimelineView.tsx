@@ -4,6 +4,7 @@ import { FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronRight as FiExpan
 import { theme } from '../../styles/theme';
 import { Avatar } from '../ui/Avatar';
 import { TaskDetail } from './TaskDetail';
+import { StoryDetail } from './StoryDetail';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { Story, Task } from '../../types';
 
@@ -138,6 +139,7 @@ interface Props { stories: Story[]; allTasks: Task[]; }
 export function TimelineView({ stories, allTasks }: Props) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [viewStart, setViewStart] = useState(() => startOfWeek(addDays(today, -7)));
   const totalDays = 42; // 6 weeks
@@ -201,8 +203,8 @@ export function TimelineView({ stories, allTasks }: Props) {
             <NameHeader>Task</NameHeader>
             {storyData.map(({ story, tasks, color }) => (
               <div key={story.id}>
-                <StoryNameRow onClick={() => toggle(story.id)}>
-                  <ExpandIcon>{expanded.has(story.id) ? <FiChevronDown /> : <FiExpand />}</ExpandIcon>
+                <StoryNameRow onClick={() => { setSelectedStoryId(story.id); setSelectedTaskId(null); }}>
+                  <ExpandIcon onClick={(e) => { e.stopPropagation(); toggle(story.id); }}>{expanded.has(story.id) ? <FiChevronDown /> : <FiExpand />}</ExpandIcon>
                   <StoryDot $c={color}>{story.title.charAt(0)}</StoryDot>
                   <StoryTitle>{story.title}</StoryTitle>
                   <span style={{ fontSize: '10px', color: theme.colors.cadetGray }}>{story.progress}%</span>
@@ -243,7 +245,7 @@ export function TimelineView({ stories, allTasks }: Props) {
                   <BarArea $days={totalDays}>
                     {storyBar && (
                       <Bar $left={storyBar.left} $width={storyBar.width} $color={color} $progress={story.progress}
-                        onClick={() => toggle(story.id)} style={{ cursor: 'pointer' }}>
+                        onClick={() => { setSelectedStoryId(story.id); setSelectedTaskId(null); }} style={{ cursor: 'pointer' }}>
                         <BarText $filled={story.progress > 30}>{story.title} — {story.progress}%</BarText>
                       </Bar>
                     )}
@@ -283,6 +285,10 @@ export function TimelineView({ stories, allTasks }: Props) {
 
       {selectedTaskId && (
         <TaskDetail taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} inline={!isMobile} />
+      )}
+      {selectedStoryId && !selectedTaskId && (
+        <StoryDetail storyId={selectedStoryId} onClose={() => setSelectedStoryId(null)}
+          onTaskClick={(id) => { setSelectedTaskId(id); setSelectedStoryId(null); }} inline={!isMobile} />
       )}
       </div>
     </Wrap>
