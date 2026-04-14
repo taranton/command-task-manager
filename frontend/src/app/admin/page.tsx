@@ -418,9 +418,9 @@ export default function AdminPage() {
         {/* ---- All Users tab ---- */}
         {tab === 'users' && isCLevel && (
           <Table>
-            <TableRow $header><div>User</div><div>Board</div><div>Region</div><div>Role</div><div>Actions</div></TableRow>
+            <TableRow $header><div>User</div><div>Boards</div><div>Region</div><div>Role</div></TableRow>
             {users?.map((u) => (
-              <TableRow key={u.id} style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr' }}>
+              <TableRow key={u.id} style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr' }}>
                 <UserCell>
                   <Avatar name={u.full_name} size={32} />
                   <UserInfo>
@@ -428,11 +428,15 @@ export default function AdminPage() {
                     <span>{u.email}</span>
                   </UserInfo>
                 </UserCell>
-                <div>
-                  <Select value={u.team_id || ''} onChange={(e) => assignTeam.mutate({ id: u.id, teamId: e.target.value || null })}>
-                    <option value="">No Board</option>
-                    {teams?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </Select>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {teams?.filter((t) => t.id === u.team_id).map((t) => (
+                    <span key={t.id} style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
+                      background: theme.colors.vividOrange + '15', color: theme.colors.vividOrange,
+                      fontWeight: 500,
+                    }}>{t.name}</span>
+                  ))}
+                  {!u.team_id && <span style={{ fontSize: '11px', color: theme.colors.cadetGray }}>—</span>}
                 </div>
                 <div>
                   <Select value={u.region_id || ''} onChange={(e) => assignRegion.mutate({ userId: u.id, regionId: e.target.value || null })}>
@@ -440,7 +444,6 @@ export default function AdminPage() {
                     {regions?.map((r) => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
                   </Select>
                 </div>
-                <div><RoleBadge $role={u.role}>{ROLES[u.role]}</RoleBadge></div>
                 <div>
                   <Select value={u.role} onChange={(e) => changeRole.mutate({ id: u.id, role: e.target.value })}>
                     {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
