@@ -21,11 +21,11 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, external_id, email, full_name, password_hash, role, avatar_url, team_id, is_active, approved, approved_by, approved_at, created_at, updated_at
+		SELECT id, external_id, email, full_name, password_hash, role, avatar_url, team_id, region_id, is_active, approved, approved_by, approved_at, created_at, updated_at
 		FROM users WHERE id = $1 AND is_active = true
 	`, id).Scan(
 		&u.ID, &u.ExternalID, &u.Email, &u.FullName, &u.Password,
-		&u.Role, &u.AvatarURL, &u.TeamID, &u.IsActive, &u.Approved, &u.ApprovedBy, &u.ApprovedAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.Role, &u.AvatarURL, &u.TeamID, &u.RegionID, &u.IsActive, &u.Approved, &u.ApprovedBy, &u.ApprovedAt, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -36,11 +36,11 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, external_id, email, full_name, password_hash, role, avatar_url, team_id, is_active, approved, approved_by, approved_at, created_at, updated_at
+		SELECT id, external_id, email, full_name, password_hash, role, avatar_url, team_id, region_id, is_active, approved, approved_by, approved_at, created_at, updated_at
 		FROM users WHERE email = $1 AND is_active = true
 	`, email).Scan(
 		&u.ID, &u.ExternalID, &u.Email, &u.FullName, &u.Password,
-		&u.Role, &u.AvatarURL, &u.TeamID, &u.IsActive, &u.Approved, &u.ApprovedBy, &u.ApprovedAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.Role, &u.AvatarURL, &u.TeamID, &u.RegionID, &u.IsActive, &u.Approved, &u.ApprovedBy, &u.ApprovedAt, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -50,7 +50,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 
 func (r *UserRepository) List(ctx context.Context) ([]model.User, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, external_id, email, full_name, role, avatar_url, team_id, is_active, approved, created_at, updated_at
+		SELECT id, external_id, email, full_name, role, avatar_url, team_id, region_id, is_active, approved, created_at, updated_at
 		FROM users WHERE is_active = true AND approved = true
 		ORDER BY full_name
 	`)
@@ -64,7 +64,7 @@ func (r *UserRepository) List(ctx context.Context) ([]model.User, error) {
 		var u model.User
 		if err := rows.Scan(
 			&u.ID, &u.ExternalID, &u.Email, &u.FullName,
-			&u.Role, &u.AvatarURL, &u.TeamID, &u.IsActive, &u.Approved, &u.CreatedAt, &u.UpdatedAt,
+			&u.Role, &u.AvatarURL, &u.TeamID, &u.RegionID, &u.IsActive, &u.Approved, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

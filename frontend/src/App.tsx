@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+import { useWebSocket } from './hooks/useWebSocket';
 import { AppShell } from './components/layout/AppShell';
 import LoginPage from './app/login/page';
 import BoardPage from './app/board/page';
@@ -7,6 +8,7 @@ import AdminPage from './app/admin/page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  useWebSocket(); // Connect to WebSocket for real-time updates
 
   if (isLoading) return null;
   if (!user) return <Navigate to="/login" replace />;

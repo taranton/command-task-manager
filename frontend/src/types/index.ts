@@ -19,6 +19,7 @@ export interface User {
   role: Role;
   avatar_url?: string;
   team_id?: string;
+  region_id?: string;
   is_active: boolean;
   approved?: boolean;
   created_at: string;
@@ -37,6 +38,14 @@ export interface Team {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  is_active: boolean;
 }
 
 export interface Story {

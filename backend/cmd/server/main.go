@@ -61,6 +61,7 @@ func main() {
 	storyHandler := handler.NewStoryHandler(storyService)
 	taskHandler := handler.NewTaskHandler(taskService, hub)
 	subtaskHandler := handler.NewSubtaskHandler(taskService, hub)
+	regionHandler := handler.NewRegionHandler(db)
 	commentRepo := repository.NewCommentRepository(db)
 	commentHandler := handler.NewCommentHandler(commentRepo)
 	boardHandler := handler.NewBoardHandler(taskService, storyService)
@@ -109,6 +110,11 @@ func main() {
 		r.Post("/api/v1/teams", adminHandler.CreateTeam)
 		r.Put("/api/v1/teams/{id}", adminHandler.UpdateTeam)
 		r.Get("/api/v1/teams/{id}/members", adminHandler.GetTeamMembers)
+
+		// Regions
+		r.Get("/api/v1/regions", regionHandler.List)
+		r.Patch("/api/v1/users/{id}/region", regionHandler.AssignUserRegion)
+		r.Patch("/api/v1/teams/{id}/region", regionHandler.AssignBoardRegion)
 
 		// Admin: user management
 		r.Get("/api/v1/users/pending", adminHandler.ListPending)

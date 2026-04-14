@@ -24,6 +24,7 @@ type User struct {
 	Role       Role      `json:"role" db:"role"`
 	AvatarURL  *string    `json:"avatar_url,omitempty" db:"avatar_url"`
 	TeamID     *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
+	RegionID   *uuid.UUID `json:"region_id,omitempty" db:"region_id"`
 	IsActive   bool       `json:"is_active" db:"is_active"`
 	Approved   bool       `json:"approved" db:"approved"`
 	ApprovedBy *uuid.UUID `json:"approved_by,omitempty" db:"approved_by"`
