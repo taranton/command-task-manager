@@ -156,11 +156,11 @@ export function TimelineView({ stories, allTasks }: Props) {
 
   const storyData = useMemo(() => stories.map((story, idx) => {
     const tasks = allTasks.filter((t) => t.story_id === story.id);
-    // Task date range
+    // Task date range — use same fallback as bar rendering (+5 days if no end)
     let taskMinDate: Date | null = null, taskMaxDate: Date | null = null;
     for (const t of tasks) {
       const s = parseD(t.start_date) || parseD(t.deadline);
-      const e = parseD(t.deadline) || s;
+      const e = parseD(t.deadline) || (s ? addDays(s, 5) : null);
       if (s && (!taskMinDate || s < taskMinDate)) taskMinDate = s;
       if (e && (!taskMaxDate || e > taskMaxDate)) taskMaxDate = e;
     }
