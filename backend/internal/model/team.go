@@ -12,6 +12,7 @@ type Team struct {
 	Name        string     `json:"name" db:"name"`
 	Description *string    `json:"description,omitempty" db:"description"`
 	Office      *string    `json:"office,omitempty" db:"office"`
+	RegionID    *uuid.UUID `json:"region_id,omitempty" db:"region_id"`
 	LeadID      *uuid.UUID `json:"lead_id,omitempty" db:"lead_id"`
 	IsActive    bool       `json:"is_active" db:"is_active"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`

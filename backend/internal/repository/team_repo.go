@@ -22,7 +22,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 	var t model.Team
 	var leadName *string
 	err := r.db.QueryRow(ctx, `
-		SELECT t.id, t.external_id, t.name, t.description, t.office, t.lead_id,
+		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id, t.lead_id,
 		       t.is_active, t.created_at, t.updated_at,
 		       u.full_name,
 		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
@@ -30,7 +30,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 		LEFT JOIN users u ON t.lead_id = u.id
 		WHERE t.id = $1
 	`, id).Scan(
-		&t.ID, &t.ExternalID, &t.Name, &t.Description, &t.Office, &t.LeadID,
+		&t.ID, &t.ExternalID, &t.Name, &t.Description, &t.Office, &t.RegionID, &t.LeadID,
 		&t.IsActive, &t.CreatedAt, &t.UpdatedAt,
 		&leadName, &t.MemberCount,
 	)
@@ -48,7 +48,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 
 func (r *TeamRepository) List(ctx context.Context) ([]model.Team, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT t.id, t.external_id, t.name, t.description, t.office, t.lead_id,
+		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id, t.lead_id,
 		       t.is_active, t.created_at, t.updated_at,
 		       u.full_name,
 		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
@@ -67,7 +67,7 @@ func (r *TeamRepository) List(ctx context.Context) ([]model.Team, error) {
 		var t model.Team
 		var leadName *string
 		if err := rows.Scan(
-			&t.ID, &t.ExternalID, &t.Name, &t.Description, &t.Office, &t.LeadID,
+			&t.ID, &t.ExternalID, &t.Name, &t.Description, &t.Office, &t.RegionID, &t.LeadID,
 			&t.IsActive, &t.CreatedAt, &t.UpdatedAt,
 			&leadName, &t.MemberCount,
 		); err != nil {

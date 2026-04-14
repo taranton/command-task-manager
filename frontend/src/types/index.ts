@@ -32,6 +32,7 @@ export interface Team {
   name: string;
   description?: string;
   office?: string;
+  region_id?: string;
   lead_id?: string;
   lead?: User;
   member_count: number;

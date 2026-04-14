@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { FiPlus, FiUsers, FiUserPlus, FiUserCheck, FiUserX, FiShield, FiMapPin } from 'react-icons/fi';
+import { FiPlus, FiUsers, FiUserPlus, FiUserCheck, FiUserX, FiShield } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { Avatar } from '../../components/ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
+import { useRegions } from '../../hooks/useRegions';
 import type { Team, User } from '../../types';
 
 // ---- Layout ----
@@ -254,6 +255,7 @@ export default function AdminPage() {
 
   const { data: teams } = useQuery<Team[]>({ queryKey: ['teams'], queryFn: () => api.get('/api/v1/teams') });
   const { data: users } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => api.get('/api/v1/users') });
+  const { data: regions } = useRegions();
   const { data: pending } = useQuery<User[]>({
     queryKey: ['users-pending'], queryFn: () => api.get('/api/v1/users/pending'), enabled: isCLevel,
   });
@@ -274,6 +276,16 @@ export default function AdminPage() {
   const createTeam = useMutation({
     mutationFn: (input: { name: string; office?: string }) => api.post('/api/v1/teams', input),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['teams'] }); setShowCreateTeam(false); setNewTeam({ name: '', office: '' }); },
+  });
+  const assignRegion = useMutation({
+    mutationFn: ({ userId, regionId }: { userId: string; regionId: string | null }) =>
+      api.patch(`/api/v1/users/${userId}/region`, { region_id: regionId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+  const assignBoardRegion = useMutation({
+    mutationFn: ({ boardId, regionId }: { boardId: string; regionId: string | null }) =>
+      api.patch(`/api/v1/teams/${boardId}/region`, { region_id: regionId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['teams'] }); },
   });
   const approveUser = useMutation({
     mutationFn: (id: string) => api.post(`/api/v1/users/${id}/approve`),
@@ -330,8 +342,14 @@ export default function AdminPage() {
                 <TeamCard key={t.id} $selected={selectedTeamId === t.id} onClick={() => setSelectedTeamId(t.id)}>
                   <TeamName>{t.name}</TeamName>
                   <TeamMeta>
-                    {t.office && <MetaChip><FiMapPin /> {t.office}</MetaChip>}
                     <MetaChip><FiUsers /> {t.member_count} members</MetaChip>
+                    {regions && (
+                      <Select value={t.region_id || ''} onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => { e.stopPropagation(); assignBoardRegion.mutate({ boardId: t.id, regionId: e.target.value || null }); }}>
+                        <option value="">No Region</option>
+                        {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </Select>
+                    )}
                   </TeamMeta>
                   {t.lead && <LeadBadge><Avatar name={t.lead.full_name} size={20} /> {t.lead.full_name}</LeadBadge>}
                 </TeamCard>
@@ -397,9 +415,9 @@ export default function AdminPage() {
         {/* ---- All Users tab ---- */}
         {tab === 'users' && isCLevel && (
           <Table>
-            <TableRow $header><div>User</div><div>Team</div><div>Role</div><div>Actions</div></TableRow>
+            <TableRow $header><div>User</div><div>Board</div><div>Region</div><div>Role</div><div>Actions</div></TableRow>
             {users?.map((u) => (
-              <TableRow key={u.id}>
+              <TableRow key={u.id} style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr' }}>
                 <UserCell>
                   <Avatar name={u.full_name} size={32} />
                   <UserInfo>
@@ -411,6 +429,12 @@ export default function AdminPage() {
                   <Select value={u.team_id || ''} onChange={(e) => assignTeam.mutate({ id: u.id, teamId: e.target.value || null })}>
                     <option value="">No Board</option>
                     {teams?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </Select>
+                </div>
+                <div>
+                  <Select value={u.region_id || ''} onChange={(e) => assignRegion.mutate({ userId: u.id, regionId: e.target.value || null })}>
+                    <option value="">No Region</option>
+                    {regions?.map((r) => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
                   </Select>
                 </div>
                 <div><RoleBadge $role={u.role}>{ROLES[u.role]}</RoleBadge></div>
