@@ -295,13 +295,13 @@ export default function AdminPage() {
   return (
     <Page>
       <TopBar>
-        <Title>Team Management</Title>
-        {isCLevel && <Btn $primary onClick={() => setShowCreateTeam(true)}><FiPlus size={16} /> New Team</Btn>}
+        <Title>Board Management</Title>
+        {isCLevel && <Btn $primary onClick={() => setShowCreateTeam(true)}><FiPlus size={16} /> New Board</Btn>}
       </TopBar>
 
       <Tabs>
         <Tab $active={tab === 'teams'} onClick={() => setTab('teams')}>
-          <FiUsers size={14} style={{ marginRight: 6 }} /> Teams
+          <FiUsers size={14} style={{ marginRight: 6 }} /> Boards
         </Tab>
         {isCLevel && (
           <Tab $active={tab === 'users'} onClick={() => setTab('users')}>
@@ -380,7 +380,7 @@ export default function AdminPage() {
 
                 {(isCLevel || isLead) && (
                   <div style={{ marginTop: theme.spacing.lg }}>
-                    <SectionTitle style={{ fontSize: theme.typography.fontSize.md }}><FiUserPlus size={16} /> Add to team</SectionTitle>
+                    <SectionTitle style={{ fontSize: theme.typography.fontSize.md }}><FiUserPlus size={16} /> Add to board</SectionTitle>
                     <AddMemberSearch
                       users={users || []}
                       teams={teams || []}
@@ -409,7 +409,7 @@ export default function AdminPage() {
                 </UserCell>
                 <div>
                   <Select value={u.team_id || ''} onChange={(e) => assignTeam.mutate({ id: u.id, teamId: e.target.value || null })}>
-                    <option value="">No Team</option>
+                    <option value="">No Board</option>
                     {teams?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </Select>
                 </div>
@@ -461,10 +461,10 @@ export default function AdminPage() {
       {showCreateTeam && (
         <Overlay onClick={(e) => e.target === e.currentTarget && setShowCreateTeam(false)}>
           <Modal>
-            <ModalHeader>Create Team</ModalHeader>
+            <ModalHeader>Create Board</ModalHeader>
             <ModalBody>
               <FormGroup>
-                <Label>Team Name *</Label>
+                <Label>Board Name *</Label>
                 <Input value={newTeam.name} onChange={(e) => setNewTeam((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. EU Development" autoFocus />
               </FormGroup>
               <FormGroup>

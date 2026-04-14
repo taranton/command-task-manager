@@ -123,7 +123,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
               onClick={() => navigate('/admin')}
             >
               <FiSettings />
-              <span>Teams</span>
+              <span>Boards</span>
             </NavItem>
           </>
         )}

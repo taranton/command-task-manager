@@ -25,7 +25,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 		SELECT t.id, t.external_id, t.name, t.description, t.office, t.lead_id,
 		       t.is_active, t.created_at, t.updated_at,
 		       u.full_name,
-		       COALESCE((SELECT COUNT(*) FROM users WHERE team_id = t.id AND is_active = true), 0) as member_count
+		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
 		FROM teams t
 		LEFT JOIN users u ON t.lead_id = u.id
 		WHERE t.id = $1
@@ -51,7 +51,7 @@ func (r *TeamRepository) List(ctx context.Context) ([]model.Team, error) {
 		SELECT t.id, t.external_id, t.name, t.description, t.office, t.lead_id,
 		       t.is_active, t.created_at, t.updated_at,
 		       u.full_name,
-		       COALESCE((SELECT COUNT(*) FROM users WHERE team_id = t.id AND is_active = true), 0) as member_count
+		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
 		FROM teams t
 		LEFT JOIN users u ON t.lead_id = u.id
 		WHERE t.is_active = true

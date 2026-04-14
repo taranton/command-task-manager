@@ -114,6 +114,8 @@ func main() {
 		r.Get("/api/v1/users/pending", adminHandler.ListPending)
 		r.Patch("/api/v1/users/{id}/role", adminHandler.UpdateUserRole)
 		r.Patch("/api/v1/users/{id}/team", adminHandler.AssignUserToTeam)
+		r.Post("/api/v1/users/{id}/remove-from-board", adminHandler.RemoveFromBoard)
+		r.Get("/api/v1/users/{id}/boards", adminHandler.GetUserBoards)
 		r.Post("/api/v1/users/{id}/approve", adminHandler.ApproveUser)
 		r.Post("/api/v1/users/{id}/reject", adminHandler.RejectUser)
 

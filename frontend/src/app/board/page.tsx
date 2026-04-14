@@ -243,7 +243,7 @@ export default function BoardPage() {
         {allTeams && allTeams.length > 0 && (
           <ChipWrap data-dropdown>
             <Chip $active={!!filter.team_id} onClick={() => toggleDrop('team')}>
-              {filter.team_id ? allTeams.find((t) => t.id === filter.team_id)?.name || 'Team' : 'Team'}
+              {filter.team_id ? allTeams.find((t) => t.id === filter.team_id)?.name || 'Board' : 'Board'}
               {filter.team_id ? <FiX onClick={(e) => { e.stopPropagation(); setFilter((f) => ({ ...f, team_id: undefined })); }} /> : <FiChevronDown />}
             </Chip>
             {openDrop === 'team' && (
