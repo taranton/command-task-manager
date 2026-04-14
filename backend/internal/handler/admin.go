@@ -233,7 +233,7 @@ func (h *AdminHandler) GetTeamMembers(w http.ResponseWriter, r *http.Request) {
 
 	// Try board_members first, fallback to users.team_id for backward compat
 	rows, err := h.db.Query(r.Context(), `
-		SELECT u.id, u.email, u.full_name, u.role, u.avatar_url, u.team_id, u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.email, u.full_name, bm.role, u.avatar_url, u.team_id, u.is_active, u.created_at, u.updated_at
 		FROM users u
 		INNER JOIN board_members bm ON u.id = bm.user_id
 		WHERE bm.board_id = $1 AND u.is_active = true
@@ -273,7 +273,53 @@ func (h *AdminHandler) GetTeamMembers(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, users)
 }
 
-// ListPending — users awaiting approval
+// UpdateBoardMemberRole — change a user's role within a specific board
+func (h *AdminHandler) UpdateBoardMemberRole(w http.ResponseWriter, r *http.Request) {
+	boardID, err := paramUUID(r, "boardId")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid board id")
+		return
+	}
+	userID, err := paramUUID(r, "userId")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	var input struct {
+		Role string `json:"role"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	role := model.Role(input.Role)
+	if role != model.RoleTeamLead && role != model.RoleMember && role != model.RoleTrainee {
+		respondError(w, http.StatusBadRequest, "role must be team_lead, member, or trainee")
+		return
+	}
+	if role == model.RoleTeamLead {
+		var existing *string
+		h.db.QueryRow(r.Context(),
+			"SELECT user_id::text FROM board_members WHERE board_id = $1 AND role = 'team_lead' AND user_id != $2",
+			boardID, userID).Scan(&existing)
+		if existing != nil {
+			respondError(w, http.StatusConflict, "board already has a Team Lead")
+			return
+		}
+	}
+	_, err = h.db.Exec(r.Context(),
+		"UPDATE board_members SET role = $1 WHERE board_id = $2 AND user_id = $3",
+		input.Role, boardID, userID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update role")
+		return
+	}
+	if role == model.RoleTeamLead {
+		h.db.Exec(r.Context(), "UPDATE teams SET lead_id = $1 WHERE id = $2", userID, boardID)
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"board_id": boardID, "user_id": userID, "role": input.Role})
+}
+
 // RemoveFromBoard — remove a user from a specific board
 func (h *AdminHandler) RemoveFromBoard(w http.ResponseWriter, r *http.Request) {
 	userID, err := paramUUID(r, "id")

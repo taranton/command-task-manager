@@ -269,6 +269,11 @@ export default function AdminPage() {
     mutationFn: ({ id, role }: { id: string; role: string }) => api.patch(`/api/v1/users/${id}/role`, { role }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); qc.invalidateQueries({ queryKey: ['team-members'] }); },
   });
+  const changeBoardRole = useMutation({
+    mutationFn: ({ boardId, userId, role }: { boardId: string; userId: string; role: string }) =>
+      api.patch(`/api/v1/teams/${boardId}/members/${userId}/role`, { role }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['team-members'] }); qc.invalidateQueries({ queryKey: ['users'] }); qc.invalidateQueries({ queryKey: ['teams'] }); },
+  });
   const assignTeam = useMutation({
     mutationFn: ({ id, teamId }: { id: string; teamId: string | null }) => api.patch(`/api/v1/users/${id}/team`, { team_id: teamId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); qc.invalidateQueries({ queryKey: ['team-members'] }); qc.invalidateQueries({ queryKey: ['teams'] }); },
@@ -373,14 +378,14 @@ export default function AdminPage() {
                       <div>
                         {(() => {
                           const hasLead = members?.some((x) => x.role === 'team_lead' && x.id !== m.id);
-                          return isCLevel ? (
-                            <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
-                              {Object.entries(ROLES).filter(([k]) => k !== 'clevel' && (k !== 'team_lead' || !hasLead || m.role === 'team_lead')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                            </Select>
-                          ) : isLead ? (
-                            <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
-                              <option value="member">Member</option>
-                              <option value="trainee">Trainee</option>
+                          const boardRoles = [
+                            ...(!hasLead || m.role === 'team_lead' ? [['team_lead', 'Team Lead']] : []),
+                            ['member', 'Member'],
+                            ['trainee', 'Trainee'],
+                          ] as [string, string][];
+                          return (isCLevel || isLead) ? (
+                            <Select value={m.role} onChange={(e) => selectedTeamId && changeBoardRole.mutate({ boardId: selectedTeamId, userId: m.id, role: e.target.value })}>
+                              {boardRoles.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                             </Select>
                           ) : (
                           <RoleBadge $role={m.role}>{ROLES[m.role]}</RoleBadge>
@@ -418,9 +423,9 @@ export default function AdminPage() {
         {/* ---- All Users tab ---- */}
         {tab === 'users' && isCLevel && (
           <Table>
-            <TableRow $header><div>User</div><div>Boards</div><div>Region</div><div>Role</div></TableRow>
+            <TableRow $header><div>User</div><div>Boards & Roles</div><div>Region</div><div>Access</div></TableRow>
             {users?.map((u) => (
-              <TableRow key={u.id} style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr' }}>
+              <TableRow key={u.id} style={{ gridTemplateColumns: '2fr 2fr 1fr 0.8fr' }}>
                 <UserCell>
                   <Avatar name={u.full_name} size={32} />
                   <UserInfo>
@@ -428,15 +433,17 @@ export default function AdminPage() {
                     <span>{u.email}</span>
                   </UserInfo>
                 </UserCell>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                  {u.boards && u.boards.length > 0 ? u.boards.map((b) => (
-                    <span key={b.id} style={{
-                      fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                      background: theme.colors.vividOrange + '15', color: theme.colors.vividOrange,
-                      fontWeight: 500,
-                    }}>{b.name}</span>
-                  )) : (
-                    <span style={{ fontSize: '11px', color: theme.colors.cadetGray }}>—</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                  {u.boards && u.boards.length > 0 ? u.boards.map((b) => {
+                    const roleColor = b.role === 'team_lead' ? theme.colors.vividOrange : b.role === 'trainee' ? '#9C27B0' : theme.colors.info;
+                    return (
+                      <span key={b.id} style={{
+                        fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
+                        background: roleColor + '15', color: roleColor, fontWeight: 500,
+                      }}>{b.name} · {b.role === 'team_lead' ? 'Lead' : b.role === 'trainee' ? 'Trainee' : 'Member'}</span>
+                    );
+                  }) : (
+                    <span style={{ fontSize: '11px', color: theme.colors.cadetGray }}>No boards</span>
                   )}
                 </div>
                 <div>
@@ -446,8 +453,9 @@ export default function AdminPage() {
                   </Select>
                 </div>
                 <div>
-                  <Select value={u.role} onChange={(e) => changeRole.mutate({ id: u.id, role: e.target.value })}>
-                    {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <Select value={u.role === 'clevel' ? 'clevel' : 'regular'} onChange={(e) => changeRole.mutate({ id: u.id, role: e.target.value === 'clevel' ? 'clevel' : 'member' })}>
+                    <option value="regular">Regular</option>
+                    <option value="clevel">C-Level</option>
                   </Select>
                 </div>
               </TableRow>
