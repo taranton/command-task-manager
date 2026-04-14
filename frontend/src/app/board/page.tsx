@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { FiPlus, FiFilter, FiX, FiChevronDown } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
@@ -149,6 +149,18 @@ export default function BoardPage() {
   const [showCreateStory, setShowCreateStory] = useState(false);
   const [createTaskStoryId, setCreateTaskStoryId] = useState<string>('');
   const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
+        setOpenDrop(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const { data: board, isLoading, error } = useBoardData(filter);
   const { data: storiesData } = useStories();
@@ -206,7 +218,7 @@ export default function BoardPage() {
       </Header>
 
       {/* ---- Filters ---- */}
-      <Filters onClick={(e) => { if ((e.target as HTMLElement).closest('[data-dropdown]') === null) setOpenDrop(null); }}>
+      <Filters ref={filtersRef}>
         <FilterIcon><FiFilter size={14} /></FilterIcon>
 
         {/* My Tasks */}

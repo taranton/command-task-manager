@@ -371,18 +371,21 @@ export default function AdminPage() {
                       </UserCell>
                       <div>{m.email}</div>
                       <div>
-                        {isCLevel ? (
-                          <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
-                            {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                          </Select>
-                        ) : isLead ? (
-                          <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
-                            <option value="member">Member</option>
-                            <option value="trainee">Trainee</option>
-                          </Select>
-                        ) : (
+                        {(() => {
+                          const hasLead = members?.some((x) => x.role === 'team_lead' && x.id !== m.id);
+                          return isCLevel ? (
+                            <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
+                              {Object.entries(ROLES).filter(([k]) => k !== 'clevel' && (k !== 'team_lead' || !hasLead || m.role === 'team_lead')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                            </Select>
+                          ) : isLead ? (
+                            <Select value={m.role} onChange={(e) => changeRole.mutate({ id: m.id, role: e.target.value })}>
+                              <option value="member">Member</option>
+                              <option value="trainee">Trainee</option>
+                            </Select>
+                          ) : (
                           <RoleBadge $role={m.role}>{ROLES[m.role]}</RoleBadge>
-                        )}
+                        );
+                        })()}
                       </div>
                       <div>
                         <Btn $danger $small onClick={() => assignTeam.mutate({ id: m.id, teamId: null })}>
