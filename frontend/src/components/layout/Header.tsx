@@ -1,7 +1,9 @@
 import styled from 'styled-components';
-import { FiMenu, FiSearch, FiBell } from 'react-icons/fi';
+import { FiMenu, FiSearch, FiBell, FiGlobe } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuth';
+import { useRegions } from '../../hooks/useRegions';
+import { useActiveRegion } from '../../hooks/useActiveRegion';
 
 const StyledHeader = styled.header`
   position: fixed;
@@ -97,8 +99,23 @@ interface HeaderProps {
   isMobile: boolean;
 }
 
+const RegionSelect = styled.select`
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: ${theme.borderRadius.pill};
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  option { color: ${theme.colors.charcoal}; background: white; }
+  &:focus { outline: none; border-color: ${theme.colors.vividOrange}; }
+`;
+
 export function Header({ onMenuToggle }: HeaderProps) {
   const { user } = useAuth();
+  const { data: regions } = useRegions();
+  const [activeRegion, setActiveRegion] = useActiveRegion();
+  const isCLevel = user?.role === 'clevel';
 
   const initials = user?.full_name
     .split(' ')
@@ -118,6 +135,17 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </Logo>
 
       <Spacer />
+
+      {/* Region selector — C-Level sees all regions, others see their region name */}
+      {isCLevel && regions && regions.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <FiGlobe size={14} style={{ color: 'rgba(255,255,255,0.6)' }} />
+          <RegionSelect value={activeRegion || ''} onChange={(e) => setActiveRegion(e.target.value || null)}>
+            <option value="">All Regions</option>
+            {regions.map((r) => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
+          </RegionSelect>
+        </div>
+      )}
 
       <IconButton title="Search (Cmd+K)">
         <FiSearch />

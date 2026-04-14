@@ -99,6 +99,7 @@ type StoryFilter struct {
 	Priority  *Priority    `json:"priority,omitempty"`
 	ProjectID *string      `json:"project_id,omitempty"`
 	TeamID    *uuid.UUID   `json:"team_id,omitempty"`
+	RegionID  *uuid.UUID   `json:"region_id,omitempty"`
 	Limit     int          `json:"limit"`
 	Offset    int          `json:"offset"`
 }

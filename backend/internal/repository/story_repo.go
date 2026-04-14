@@ -85,6 +85,11 @@ func (r *StoryRepository) List(ctx context.Context, filter model.StoryFilter) ([
 		args = append(args, *filter.TeamID)
 		argIdx++
 	}
+	if filter.RegionID != nil {
+		conditions = append(conditions, fmt.Sprintf("s.team_id IN (SELECT id FROM teams WHERE region_id = $%d)", argIdx))
+		args = append(args, *filter.RegionID)
+		argIdx++
+	}
 
 	where := "WHERE " + strings.Join(conditions, " AND ")
 

@@ -64,7 +64,7 @@ func main() {
 	regionHandler := handler.NewRegionHandler(db)
 	commentRepo := repository.NewCommentRepository(db)
 	commentHandler := handler.NewCommentHandler(commentRepo)
-	boardHandler := handler.NewBoardHandler(taskService, storyService)
+	boardHandler := handler.NewBoardHandler(taskService, storyService, db)
 	wsHandler := handler.NewWSHandler(hub, authService)
 
 	// Router

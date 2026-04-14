@@ -103,6 +103,7 @@ type TaskFilter struct {
 	StoryID    *uuid.UUID  `json:"story_id,omitempty"`
 	AssigneeID *uuid.UUID  `json:"assignee_id,omitempty"`
 	TeamID     *uuid.UUID  `json:"team_id,omitempty"`
+	RegionID   *uuid.UUID  `json:"region_id,omitempty"`
 	Status     *TaskStatus `json:"status,omitempty"`
 	Priority   *Priority   `json:"priority,omitempty"`
 	Limit      int         `json:"limit"`

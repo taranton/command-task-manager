@@ -22,6 +22,9 @@ export function useBoardData(filter: BoardFilter = {}) {
   if (filter.assignee_id) params.set('assignee', filter.assignee_id);
   if (filter.team_id) params.set('team', filter.team_id);
   if (filter.priority) params.set('priority', filter.priority);
+  // Pass active region if set (C-Level switching)
+  const activeRegion = localStorage.getItem('active_region');
+  if (activeRegion) params.set('region', activeRegion);
 
   const qs = params.toString();
   const path = `/api/v1/board${qs ? `?${qs}` : ''}`;

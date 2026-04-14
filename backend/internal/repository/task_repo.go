@@ -139,6 +139,12 @@ func (r *TaskRepository) list(ctx context.Context, filter *model.TaskFilter) ([]
 		args = append(args, *filter.TeamID)
 		argIdx++
 	}
+	if filter.RegionID != nil {
+		// Filter by region: tasks whose board (team) belongs to the region
+		conditions = append(conditions, fmt.Sprintf("t.team_id IN (SELECT id FROM teams WHERE region_id = $%d)", argIdx))
+		args = append(args, *filter.RegionID)
+		argIdx++
+	}
 
 	where := "WHERE " + strings.Join(conditions, " AND ")
 
