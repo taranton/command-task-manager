@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/qrt/command/internal/model"
@@ -180,6 +181,19 @@ func (s *TaskService) CreateTask(ctx context.Context, storyID uuid.UUID, input m
 
 	maxOrder, _ := s.taskRepo.GetMaxSortOrder(ctx, storyID)
 
+	// Default start_date = today, deadline = today + 14 days
+	now := time.Now()
+	startDate := parseDate(input.StartDate)
+	if startDate == nil {
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		startDate = &today
+	}
+	deadline := parseDate(input.Deadline)
+	if deadline == nil {
+		twoWeeks := time.Date(now.Year(), now.Month(), now.Day()+14, 0, 0, 0, 0, now.Location())
+		deadline = &twoWeeks
+	}
+
 	task := &model.Task{
 		StoryID:        storyID,
 		Title:          input.Title,
@@ -187,8 +201,8 @@ func (s *TaskService) CreateTask(ctx context.Context, storyID uuid.UUID, input m
 		Status:         model.TaskStatusBacklog,
 		Priority:       input.Priority,
 		AssigneeID:     input.AssigneeID,
-		StartDate:      parseDate(input.StartDate),
-		Deadline:       parseDate(input.Deadline),
+		StartDate:      startDate,
+		Deadline:       deadline,
 		EstimatedHours: input.EstimatedHours,
 		SortOrder:      maxOrder + 1000,
 		CreatedBy:      userID,

@@ -169,10 +169,15 @@ export function CreateTaskModal({
   onSubmit,
   isLoading,
 }: CreateTaskModalProps) {
+  // Default: start_date = today, deadline = today + 14 days
+  const todayStr = new Date().toISOString().split('T')[0];
+  const twoWeeksStr = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
-  const [deadline, setDeadline] = useState('');
+  const [startDate, setStartDate] = useState(todayStr);
+  const [deadline, setDeadline] = useState(twoWeeksStr);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
 
@@ -195,6 +200,7 @@ export function CreateTaskModal({
         title: title.trim(),
         description: description || undefined,
         priority,
+        start_date: startDate || undefined,
         deadline: deadline || undefined,
       },
       subtasks
@@ -258,6 +264,16 @@ export function CreateTaskModal({
                   <option value="low">Low</option>
                 </Select>
               </FormGroup>
+              <FormGroup>
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </FormGroup>
+            </Row>
+            <Row>
               <FormGroup>
                 <Label>Deadline</Label>
                 <Input
