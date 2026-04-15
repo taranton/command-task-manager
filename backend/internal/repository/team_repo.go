@@ -22,12 +22,15 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 	var t model.Team
 	var leadName *string
 	err := r.db.QueryRow(ctx, `
-		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id, t.lead_id,
+		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id,
+		       COALESCE(t.lead_id, (SELECT user_id FROM board_members WHERE board_id = t.id AND role = 'team_lead' LIMIT 1)),
 		       t.is_active, t.created_at, t.updated_at,
-		       u.full_name,
+		       COALESCE(
+		         (SELECT full_name FROM users WHERE id = t.lead_id),
+		         (SELECT u.full_name FROM users u INNER JOIN board_members bm ON u.id = bm.user_id WHERE bm.board_id = t.id AND bm.role = 'team_lead' LIMIT 1)
+		       ),
 		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
 		FROM teams t
-		LEFT JOIN users u ON t.lead_id = u.id
 		WHERE t.id = $1
 	`, id).Scan(
 		&t.ID, &t.ExternalID, &t.Name, &t.Description, &t.Office, &t.RegionID, &t.LeadID,
@@ -48,12 +51,15 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Team
 
 func (r *TeamRepository) List(ctx context.Context) ([]model.Team, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id, t.lead_id,
+		SELECT t.id, t.external_id, t.name, t.description, t.office, t.region_id,
+		       COALESCE(t.lead_id, (SELECT user_id FROM board_members WHERE board_id = t.id AND role = 'team_lead' LIMIT 1)),
 		       t.is_active, t.created_at, t.updated_at,
-		       u.full_name,
+		       COALESCE(
+		         (SELECT full_name FROM users WHERE id = t.lead_id),
+		         (SELECT u2.full_name FROM users u2 INNER JOIN board_members bm ON u2.id = bm.user_id WHERE bm.board_id = t.id AND bm.role = 'team_lead' LIMIT 1)
+		       ),
 		       COALESCE((SELECT COUNT(*) FROM board_members WHERE board_id = t.id), 0) as member_count
 		FROM teams t
-		LEFT JOIN users u ON t.lead_id = u.id
 		WHERE t.is_active = true
 		ORDER BY t.name
 	`)
