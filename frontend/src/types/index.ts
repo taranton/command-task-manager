@@ -48,6 +48,7 @@ export interface Region {
   code: string;
   description?: string;
   is_active: boolean;
+  offices: string[];
 }
 
 export interface Story {
@@ -68,6 +69,7 @@ export interface Story {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+  archived_at?: string | null;
   tasks?: Task[];
   task_count: number;
 }
@@ -248,6 +250,7 @@ export interface BoardFilter {
   story_id?: string;
   assignee_id?: string;
   team_id?: string;
+  region_id?: string;
   priority?: Priority;
   search?: string;
 }

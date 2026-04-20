@@ -149,7 +149,20 @@ export function TimelineView({ stories, allTasks }: Props) {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [scale, setScale] = useState<Scale>('days');
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
-  const [viewStart, setViewStart] = useState(() => startOfWeek(addDays(today, -7)));
+  // Start axis at the earliest start_date of ongoing (non-done) stories.
+  // Fallback to "today minus one week" if nothing found.
+  const earliestOngoingStart = useMemo(() => {
+    let min: Date | null = null;
+    for (const s of stories) {
+      if (s.status === 'done' || s.status === 'closed') continue;
+      const d = parseD(s.start_date);
+      if (d && (!min || d < min)) min = d;
+    }
+    return min;
+  }, [stories]);
+  const [viewStart, setViewStart] = useState(() =>
+    earliestOngoingStart ? startOfWeek(earliestOngoingStart) : startOfWeek(addDays(today, -7)),
+  );
   const { cellWidth, totalDays } = SCALE_CONFIG[scale];
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(stories.map((s) => s.id)));
 

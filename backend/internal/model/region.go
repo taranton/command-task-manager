@@ -12,6 +12,7 @@ type Region struct {
 	Code        string    `json:"code" db:"code"`
 	Description *string   `json:"description,omitempty" db:"description"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
+	Offices     []string  `json:"offices" db:"offices"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }

@@ -74,6 +74,18 @@ func (s *StoryService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.storyRepo.Delete(ctx, id)
 }
 
+func (s *StoryService) Archive(ctx context.Context, id uuid.UUID) error {
+	return s.storyRepo.Archive(ctx, id)
+}
+
+func (s *StoryService) Unarchive(ctx context.Context, id uuid.UUID, newDeadline *time.Time) error {
+	return s.storyRepo.Unarchive(ctx, id, newDeadline)
+}
+
+func (s *StoryService) EarliestOngoingStartDate(ctx context.Context, regionID *uuid.UUID) (*time.Time, error) {
+	return s.storyRepo.EarliestOngoingStartDate(ctx, regionID)
+}
+
 func parseDate(s *string) *time.Time {
 	if s == nil || *s == "" {
 		return nil

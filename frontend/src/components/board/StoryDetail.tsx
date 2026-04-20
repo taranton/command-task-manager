@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { FiChevronsRight, FiX, FiTrash2, FiCheckSquare } from 'react-icons/fi';
+import { FiChevronsRight, FiX, FiTrash2, FiCheckSquare, FiArchive, FiRotateCcw } from 'react-icons/fi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
 import { Avatar } from '../ui/Avatar';
 import { useUsers } from '../../hooks/useUsers';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useArchiveStory, useUnarchiveStory } from '../../hooks/useBoardData';
+import { StoryRelationships } from './Relationships';
 import type { Story, Task } from '../../types';
 import { STORY_STATUS_LABELS, PRIORITY_LABELS } from '../../types';
 
@@ -94,14 +96,39 @@ const DeleteBtn = styled.button`
   &:hover { background: ${theme.colors.error}; color: white; }
 `;
 
+const ActionBtn = styled.button<{ $accent: string }>`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: white;
+  color: ${(p) => p.$accent};
+  border: 1px solid ${(p) => p.$accent}44;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  &:hover {
+    background: ${(p) => p.$accent}18;
+  }
+`;
+
+// Default restore deadline = today + 14 days, ISO date string.
+function defaultRestoreDeadline(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}
+
 interface Props {
   storyId: string;
   onClose: () => void;
   onTaskClick?: (taskId: string) => void;
+  onOpenStory?: (storyId: string) => void;
   inline?: boolean;
 }
 
-export function StoryDetail({ storyId, onClose, onTaskClick, inline = false }: Props) {
+export function StoryDetail({ storyId, onClose, onTaskClick, onOpenStory, inline = false }: Props) {
   const isMobile = useIsMobile();
   const qc = useQueryClient();
   const { data: users } = useUsers();
@@ -130,6 +157,9 @@ export function StoryDetail({ storyId, onClose, onTaskClick, inline = false }: P
     },
   });
 
+  const archiveStory = useArchiveStory();
+  const unarchiveStory = useUnarchiveStory();
+
   const deleteStory = useMutation({
     mutationFn: () => api.delete(`/api/v1/stories/${storyId}`),
     onSuccess: () => {
@@ -151,6 +181,7 @@ export function StoryDetail({ storyId, onClose, onTaskClick, inline = false }: P
   const content = (showClose: boolean) => (
     <>
       <PanelHeader>
+        <div style={{ flex: 1 }} />
         <span style={{ fontSize: 14, color: theme.colors.cadetGray }}>Story Details</span>
         {showClose && <CloseButton onClick={onClose}><FiX /></CloseButton>}
       </PanelHeader>
@@ -212,7 +243,9 @@ export function StoryDetail({ storyId, onClose, onTaskClick, inline = false }: P
 
             <Separator />
 
-            <SectionTitle><FiCheckSquare size={16} /> Tasks ({tasks?.length || 0})</SectionTitle>
+            <StoryRelationships storyId={storyId} onOpenStory={onOpenStory} onOpenTask={onTaskClick} />
+
+            <SectionTitle style={{ marginTop: 12 }}><FiCheckSquare size={16} /> Tasks ({tasks?.length || 0})</SectionTitle>
             {tasks && tasks.length > 0 ? tasks.map((t) => (
               <TaskRow key={t.id} onClick={() => onTaskClick?.(t.id)}>
                 <TaskStatus $color={statusColors[t.status] || '#999'}>{t.status.replace('_', ' ')}</TaskStatus>
@@ -224,9 +257,68 @@ export function StoryDetail({ storyId, onClose, onTaskClick, inline = false }: P
             )}
 
             <Separator />
-            <DeleteBtn onClick={() => { if (window.confirm('Delete this story and all its tasks?')) deleteStory.mutate(); }}>
-              <FiTrash2 size={14} /> Delete Story
-            </DeleteBtn>
+            {story.archived_at ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div
+                  style={{
+                    padding: 10,
+                    background: theme.colors.lightGray,
+                    borderRadius: theme.borderRadius.md,
+                    fontSize: 12,
+                    color: theme.colors.davysGray,
+                  }}
+                >
+                  Archived {new Date(story.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+                <ActionBtn
+                  $accent={theme.colors.success}
+                  onClick={() => {
+                    const def = defaultRestoreDeadline();
+                    const input = window.prompt(
+                      'Restore story with new deadline (YYYY-MM-DD):',
+                      def,
+                    );
+                    if (!input) return;
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+                      alert('Date must be in YYYY-MM-DD format.');
+                      return;
+                    }
+                    unarchiveStory.mutate({ id: story.id, deadline: input });
+                  }}
+                >
+                  <FiRotateCcw size={14} /> Restore from archive
+                </ActionBtn>
+                <DeleteBtn
+                  onClick={() => {
+                    if (window.confirm('Permanently delete this story and all its tasks? This cannot be undone.')) deleteStory.mutate();
+                  }}
+                >
+                  <FiTrash2 size={14} /> Delete permanently
+                </DeleteBtn>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <ActionBtn
+                  $accent={theme.colors.cadetGray}
+                  onClick={() => {
+                    const msg =
+                      story.status === 'done'
+                        ? `Archive "${story.title}"? It will be hidden from active views but stay in the stats.`
+                        : `Archive "${story.title}" (still in progress)? You can restore it later with a new deadline.`;
+                    if (window.confirm(msg)) archiveStory.mutate(story.id);
+                  }}
+                >
+                  <FiArchive size={14} /> Archive story
+                </ActionBtn>
+                <DeleteBtn
+                  onClick={() => {
+                    if (window.confirm('Delete this story and all its tasks?')) deleteStory.mutate();
+                  }}
+                >
+                  <FiTrash2 size={14} /> Delete Story
+                </DeleteBtn>
+              </div>
+            )}
           </>
         )}
       </PanelBody>

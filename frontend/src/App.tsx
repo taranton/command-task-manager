@@ -4,7 +4,10 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { AppShell } from './components/layout/AppShell';
 import LoginPage from './app/login/page';
 import BoardPage from './app/board/page';
+import YourBoardsPage from './app/boards/page';
 import AdminPage from './app/admin/page';
+import CLevelBoardPage from './app/clevel/page';
+import ExecutivePage from './app/executive/page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -27,8 +30,12 @@ export default function App() {
             <AppShell>
               <Routes>
                 <Route path="/" element={<Navigate to="/board" replace />} />
-                <Route path="/board" element={<BoardPage />} />
+                <Route path="/board" element={<YourBoardsPage />} />
+                <Route path="/board/region/:regionId" element={<BoardPage />} />
+                <Route path="/board/:teamId" element={<BoardPage />} />
                 <Route path="/my-tasks" element={<BoardPage />} />
+                <Route path="/c-level" element={<CLevelBoardPage />} />
+                <Route path="/executive" element={<ExecutivePage />} />
                 <Route path="/admin" element={<AdminPage />} />
               </Routes>
             </AppShell>

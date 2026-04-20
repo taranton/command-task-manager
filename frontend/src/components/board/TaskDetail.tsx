@@ -10,6 +10,7 @@ import { useUsers } from '../../hooks/useUsers';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Avatar } from '../ui/Avatar';
+import { TaskRelationships } from './Relationships';
 import type { Subtask, SubtaskStatus } from '../../types';
 import { TASK_STATUS_LABELS, PRIORITY_LABELS } from '../../types';
 
@@ -320,10 +321,11 @@ const Loading = styled.div`
 interface TaskDetailProps {
   taskId: string;
   onClose: () => void;
+  onOpenStory?: (storyId: string) => void;
   inline?: boolean;
 }
 
-export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps) {
+export function TaskDetail({ taskId, onClose, onOpenStory, inline = false }: TaskDetailProps) {
   const isMobile = useIsMobile();
   const qc = useQueryClient();
   const { data: task, isLoading } = useTask(taskId);
@@ -394,6 +396,7 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
   const panelContent = (showClose: boolean) => (
     <>
       <PanelHeader>
+        <div style={{ flex: 1 }} />
         <span style={{ fontSize: theme.typography.fontSize.sm, color: theme.colors.cadetGray }}>
           Task Details
         </span>
@@ -524,6 +527,8 @@ export function TaskDetail({ taskId, onClose, inline = false }: TaskDetailProps)
                   </MetaValue>
                 </MetaItem>
               </MetaGrid>
+
+              <TaskRelationships taskId={taskId} storyId={task.story_id} onOpenStory={onOpenStory} />
 
               <Separator />
 

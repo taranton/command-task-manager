@@ -109,6 +109,22 @@ echo "   Permissions ✓"
 
 echo "   Migration complete!"
 
+# 2b. Apply file-based migrations (012+ covering regions, analytics, releases/deps/events, archives, etc.)
+echo "2b. Applying file migrations via cmd/migrate..."
+cd backend
+# Uses DATABASE_URL if set, otherwise the same default as the server binary.
+DATABASE_URL="${DATABASE_URL:-postgres://command:command@localhost:5432/command?sslmode=disable}" \
+  go run ./cmd/migrate migrations
+cd ..
+
+# Grants for any tables added by file migrations (idempotent)
+for tbl in regions command_daily_snapshots command_releases command_release_stories \
+           command_story_deps command_external_blockers command_timeline_events \
+           region_archives board_members; do
+  $PG "GRANT ALL ON $tbl TO command;" 2>/dev/null || true
+done
+echo "   File migrations ✓"
+
 # 3. Build backend
 echo "3. Building backend..."
 cd backend

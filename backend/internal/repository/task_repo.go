@@ -113,6 +113,8 @@ func (r *TaskRepository) list(ctx context.Context, filter *model.TaskFilter) ([]
 	argIdx := 1
 
 	conditions = append(conditions, "t.deleted_at IS NULL")
+	// Exclude tasks belonging to archived stories from board/list views.
+	conditions = append(conditions, "NOT EXISTS (SELECT 1 FROM stories s2 WHERE s2.id = t.story_id AND s2.archived_at IS NOT NULL)")
 
 	if filter.StoryID != nil {
 		conditions = append(conditions, fmt.Sprintf("t.story_id = $%d", argIdx))

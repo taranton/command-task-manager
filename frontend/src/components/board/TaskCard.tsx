@@ -111,10 +111,11 @@ interface TaskCardProps {
   task: Task;
   onClick: (task: Task) => void;
   hideStoryMarker?: boolean;
+  boardLabel?: string;
 }
 
 export const TaskCardComponent = forwardRef<HTMLDivElement, TaskCardProps & { isDragging?: boolean; isOverlay?: boolean; style?: React.CSSProperties }>(
-  ({ task, onClick, hideStoryMarker = false, isDragging = false, isOverlay = false, style }, ref) => {
+  ({ task, onClick, hideStoryMarker = false, boardLabel, isDragging = false, isOverlay = false, style }, ref) => {
     const [showSubtasks, setShowSubtasks] = useState(false);
     const [loadedSubtasks, setLoadedSubtasks] = useState<Subtask[]>([]);
     const subtaskPct = task.subtask_count > 0 ? Math.round((task.subtask_done / task.subtask_count) * 100) : 0;
@@ -134,6 +135,26 @@ export const TaskCardComponent = forwardRef<HTMLDivElement, TaskCardProps & { is
     return (
       <Card ref={ref} style={style} $isDragging={isDragging} $isOverlay={isOverlay} $isDone={isDone}
         onClick={() => onClick(task)}>
+
+        {/* Board label — shown only in aggregated views (e.g. region view) */}
+        {boardLabel && (
+          <div
+            style={{
+              display: 'inline-block',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0.4,
+              textTransform: 'uppercase',
+              padding: '2px 8px',
+              borderRadius: 10,
+              background: theme.colors.charcoal,
+              color: theme.colors.white,
+              marginBottom: 6,
+            }}
+          >
+            {boardLabel}
+          </div>
+        )}
 
         {/* Story marker */}
         {!hideStoryMarker && task.story_title && (
@@ -190,12 +211,12 @@ export const TaskCardComponent = forwardRef<HTMLDivElement, TaskCardProps & { is
 
 TaskCardComponent.displayName = 'TaskCard';
 
-export function SortableTaskCard({ task, onClick, hideStoryMarker }: TaskCardProps) {
+export function SortableTaskCard({ task, onClick, hideStoryMarker, boardLabel }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, data: { task } });
   const style: React.CSSProperties = { transform: CSS.Translate.toString(transform), transition };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCardComponent task={task} onClick={onClick} isDragging={isDragging} hideStoryMarker={hideStoryMarker} />
+      <TaskCardComponent task={task} onClick={onClick} isDragging={isDragging} hideStoryMarker={hideStoryMarker} boardLabel={boardLabel} />
     </div>
   );
 }

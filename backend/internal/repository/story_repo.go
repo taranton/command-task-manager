@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -32,13 +33,13 @@ func (r *StoryRepository) Create(ctx context.Context, s *model.Story) error {
 
 const storySelectCols = `s.id, s.title, s.description, s.status, s.progress, s.priority,
 	s.project_id, s.tags, s.assigned_lead, s.team_id, s.start_date, s.deadline,
-	s.sort_order, s.created_by, s.created_at, s.updated_at`
+	s.sort_order, s.created_by, s.created_at, s.updated_at, s.archived_at`
 
 func scanStory(row pgx.Row, s *model.Story) error {
 	return row.Scan(
 		&s.ID, &s.Title, &s.Description, &s.Status, &s.Progress, &s.Priority,
 		&s.ProjectID, &s.Tags, &s.AssignedLead, &s.TeamID, &s.StartDate, &s.Deadline,
-		&s.SortOrder, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt,
+		&s.SortOrder, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt, &s.ArchivedAt,
 		&s.TaskCount, &s.CompletedTaskCount,
 	)
 }
@@ -64,6 +65,11 @@ func (r *StoryRepository) List(ctx context.Context, filter model.StoryFilter) ([
 	argIdx := 1
 
 	conditions = append(conditions, "s.deleted_at IS NULL")
+	if filter.ArchivedOnly {
+		conditions = append(conditions, "s.archived_at IS NOT NULL")
+	} else {
+		conditions = append(conditions, "s.archived_at IS NULL")
+	}
 
 	if filter.Status != nil {
 		conditions = append(conditions, fmt.Sprintf("s.status = $%d", argIdx))
@@ -124,7 +130,7 @@ func (r *StoryRepository) List(ctx context.Context, filter model.StoryFilter) ([
 		if err := rows.Scan(
 			&s.ID, &s.Title, &s.Description, &s.Status, &s.Progress, &s.Priority,
 			&s.ProjectID, &s.Tags, &s.AssignedLead, &s.TeamID, &s.StartDate, &s.Deadline,
-			&s.SortOrder, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt,
+			&s.SortOrder, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt, &s.ArchivedAt,
 			&s.TaskCount, &s.CompletedTaskCount,
 		); err != nil {
 			return nil, 0, err
@@ -214,4 +220,44 @@ func (r *StoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	// Soft delete
 	_, err := r.db.Exec(ctx, "UPDATE stories SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1", id)
 	return err
+}
+
+func (r *StoryRepository) Archive(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx,
+		"UPDATE stories SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL",
+		id)
+	return err
+}
+
+// Unarchive clears the archive flag. If `newDeadline` is non-nil, it also resets
+// the deadline (used when restoring incomplete stories).
+func (r *StoryRepository) Unarchive(ctx context.Context, id uuid.UUID, newDeadline *time.Time) error {
+	if newDeadline != nil {
+		_, err := r.db.Exec(ctx,
+			"UPDATE stories SET archived_at = NULL, deadline = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+			id, *newDeadline)
+		return err
+	}
+	_, err := r.db.Exec(ctx,
+		"UPDATE stories SET archived_at = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+		id)
+	return err
+}
+
+// EarliestOngoingStartDate returns the start_date of the oldest active (non-done,
+// non-archived) story. Used by the board timeline to decide where the axis starts.
+// Returns nil if there are no ongoing stories with a start_date.
+func (r *StoryRepository) EarliestOngoingStartDate(ctx context.Context, regionID *uuid.UUID) (*time.Time, error) {
+	var d *time.Time
+	err := r.db.QueryRow(ctx, `
+		SELECT MIN(s.start_date)
+		FROM stories s
+		LEFT JOIN teams tm ON s.team_id = tm.id
+		WHERE s.deleted_at IS NULL
+		  AND s.archived_at IS NULL
+		  AND s.status IN ('backlog', 'active')
+		  AND s.start_date IS NOT NULL
+		  AND ($1::uuid IS NULL OR tm.region_id = $1)
+	`, regionID).Scan(&d)
+	return d, err
 }

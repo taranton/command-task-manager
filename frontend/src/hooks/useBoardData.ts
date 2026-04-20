@@ -11,7 +11,14 @@ import type {
 
 // Stable serialization for query key
 function boardKey(filter: BoardFilter) {
-  return ['board', filter.story_id || '', filter.assignee_id || '', filter.team_id || '', filter.priority || ''] as const;
+  return [
+    'board',
+    filter.story_id || '',
+    filter.assignee_id || '',
+    filter.team_id || '',
+    filter.region_id || '',
+    filter.priority || '',
+  ] as const;
 }
 
 let currentBoardKey: readonly string[] = boardKey({});
@@ -22,9 +29,15 @@ export function useBoardData(filter: BoardFilter = {}) {
   if (filter.assignee_id) params.set('assignee', filter.assignee_id);
   if (filter.team_id) params.set('team', filter.team_id);
   if (filter.priority) params.set('priority', filter.priority);
-  // Pass active region if set (C-Level switching)
-  const activeRegion = localStorage.getItem('active_region');
-  if (activeRegion) params.set('region', activeRegion);
+  // Region: explicit filter.region_id wins; otherwise fall back to the active region
+  // (C-Level switcher), but never together with a specific board (AND filter would
+  // be redundant and can zero-out when board lives in a different region).
+  if (filter.region_id) {
+    params.set('region', filter.region_id);
+  } else if (!filter.team_id) {
+    const activeRegion = localStorage.getItem('active_region');
+    if (activeRegion) params.set('region', activeRegion);
+  }
 
   const qs = params.toString();
   const path = `/api/v1/board${qs ? `?${qs}` : ''}`;
@@ -80,6 +93,50 @@ export function useCreateStory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['stories'] });
     },
+  });
+}
+
+export function useArchivedStories() {
+  return useQuery<{ data: Story[]; total: number }>({
+    queryKey: ['stories', 'archived'],
+    queryFn: () => api.get('/api/v1/stories?archived=true&limit=500'),
+    staleTime: 30_000,
+  });
+}
+
+export function useArchiveStory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/api/v1/stories/${id}/archive`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stories'] });
+      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['analytics'] });
+    },
+  });
+}
+
+export function useUnarchiveStory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, deadline }: { id: string; deadline?: string }) =>
+      api.post(`/api/v1/stories/${id}/unarchive`, deadline ? { deadline } : undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stories'] });
+      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['analytics'] });
+    },
+  });
+}
+
+export interface TimelineStart {
+  start_date: string | null;
+}
+export function useTimelineStart(region: string) {
+  return useQuery<TimelineStart>({
+    queryKey: ['timeline-start', region],
+    queryFn: () => api.get(`/api/v1/stories/timeline-start?region=${region}`),
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -1,11 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import styled from 'styled-components';
-import { FiPlus, FiFilter, FiX, FiChevronDown } from 'react-icons/fi';
+import { FiPlus, FiFilter, FiX, FiChevronDown, FiArrowLeft, FiSettings } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { api } from '../../lib/api';
+import { BoardSettings } from '../../components/board/BoardSettings';
+import { useBoardsOverview } from '../../hooks/useBoardsOverview';
 import { KanbanBoard } from '../../components/board/KanbanBoard';
 import { BacklogTable } from '../../components/board/BacklogTable';
 import { TimelineView } from '../../components/board/TimelineView';
+import { ArchivedStoriesView } from '../../components/board/ArchivedStoriesView';
 import { CreateTaskModal } from '../../components/forms/CreateTask';
 import { CreateStoryModal } from '../../components/forms/CreateStory';
 import { Avatar } from '../../components/ui/Avatar';
@@ -17,6 +22,7 @@ import {
   useCreateStory,
 } from '../../hooks/useBoardData';
 import { useUsers, useTeams } from '../../hooks/useUsers';
+import { useRegions } from '../../hooks/useRegions';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { BoardFilter, TaskStatus, Task, Priority } from '../../types';
@@ -33,13 +39,51 @@ const Header = styled.div`
   @media (max-width: ${theme.breakpoints.sm}) { padding: ${theme.spacing.sm} ${theme.spacing.md}; }
 `;
 
-const HeaderLeft = styled.div`display: flex; align-items: center; gap: ${theme.spacing.md};`;
+const HeaderLeft = styled.div`display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; flex: 1;`;
+
+const TitleRow = styled.div`display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0;`;
+
+const BackBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: ${theme.colors.background};
+  border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.pill};
+  font-size: 12px;
+  font-weight: 600;
+  color: ${theme.colors.davysGray};
+  cursor: pointer;
+  transition: ${theme.transitions.default};
+  flex-shrink: 0;
+
+  &:hover {
+    background: ${theme.colors.lightGray};
+    color: ${theme.colors.charcoal};
+  }
+
+  svg { width: 12px; height: 12px; }
+`;
 
 const PageTitle = styled.h1`
   font-family: ${theme.typography.fontFamily.primary};
   font-size: ${theme.typography.fontSize['2xl']};
   font-weight: ${theme.typography.fontWeight.bold};
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   @media (max-width: ${theme.breakpoints.sm}) { font-size: ${theme.typography.fontSize.lg}; }
+`;
+
+const BoardMetaLine = styled.div`
+  font-size: 11px;
+  color: ${theme.colors.cadetGray};
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 `;
 
 const ViewSwitcher = styled.div`
@@ -53,6 +97,27 @@ const ViewBtn = styled.button<{ $active: boolean }>`
   color: ${(p) => p.$active ? theme.colors.charcoal : theme.colors.cadetGray};
   box-shadow: ${(p) => p.$active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'};
   transition: ${theme.transitions.default};
+`;
+
+const SettingsBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: ${theme.colors.background};
+  border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.md};
+  color: ${theme.colors.davysGray};
+  cursor: pointer;
+  transition: ${theme.transitions.default};
+
+  &:hover {
+    background: ${theme.colors.lightGray};
+    color: ${theme.colors.charcoal};
+  }
+
+  svg { width: 16px; height: 16px; }
 `;
 
 const AddBtn = styled.button`
@@ -143,10 +208,39 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function BoardPage() {
   const isMobile = useIsMobile();
   const { user: me } = useAuth();
-  const [viewMode, setViewMode] = useState<'kanban' | 'backlog' | 'timeline'>('kanban');
-  const [filter, setFilter] = useState<BoardFilter>({});
+  const [viewMode, setViewMode] = usePersistedState<'kanban' | 'backlog' | 'timeline' | 'archive'>(
+    'board:viewMode',
+    'kanban',
+  );
+  const { teamId: teamIdParam, regionId: regionIdParam } = useParams<{
+    teamId?: string;
+    regionId?: string;
+  }>();
+  const navigate = useNavigate();
+  // URL modes:
+  //   /board/:teamId          → filter locked to that board
+  //   /board/region/:regionId → filter locked to that region (aggregated view across boards)
+  //   /my-tasks               → free browsing
+  const [filter, setFilter] = useState<BoardFilter>(() =>
+    teamIdParam
+      ? { team_id: teamIdParam }
+      : regionIdParam
+        ? { region_id: regionIdParam }
+        : {},
+  );
+  // Keep filter in sync when URL params change (e.g., user switches boards inline)
+  useEffect(() => {
+    if (teamIdParam && filter.team_id !== teamIdParam) {
+      setFilter({ team_id: teamIdParam });
+    } else if (regionIdParam && filter.region_id !== regionIdParam) {
+      setFilter({ region_id: regionIdParam });
+    } else if (!teamIdParam && !regionIdParam && (filter.team_id || filter.region_id)) {
+      setFilter({});
+    }
+  }, [teamIdParam, regionIdParam, filter.team_id, filter.region_id]);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [createTaskStoryId, setCreateTaskStoryId] = useState<string>('');
   const [openDrop, setOpenDrop] = useState<string | null>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -166,6 +260,23 @@ export default function BoardPage() {
   const { data: storiesData } = useStories();
   const { data: allUsers } = useUsers();
   const { data: allTeams } = useTeams();
+  const { data: allRegions } = useRegions();
+  const { data: overview } = useBoardsOverview();
+  const currentBoard = teamIdParam ? allTeams?.find((t) => t.id === teamIdParam) : undefined;
+  const currentRegion = regionIdParam ? allRegions?.find((r) => r.id === regionIdParam) : undefined;
+  const overviewEntry = teamIdParam ? overview?.find((o) => o.id === teamIdParam) : undefined;
+  const myBoardRole = overviewEntry?.my_role || null;
+  const isCLevel = me?.role === 'clevel';
+  const canOpenSettings = !!teamIdParam && (isCLevel || myBoardRole !== null);
+  // Scope stories for Backlog/Timeline. /api/v1/stories is unscoped, so filter client-side.
+  const boardsInRegion = regionIdParam
+    ? new Set((allTeams || []).filter((t) => t.region_id === regionIdParam).map((t) => t.id))
+    : null;
+  const scopedStories = teamIdParam
+    ? (storiesData?.data || []).filter((s) => s.team_id === teamIdParam)
+    : regionIdParam && boardsInRegion
+      ? (storiesData?.data || []).filter((s) => !!s.team_id && boardsInRegion.has(s.team_id))
+      : null;
   const stories = storiesData?.data || [];
 
   const updateStatus = useUpdateTaskStatus();
@@ -190,7 +301,7 @@ export default function BoardPage() {
   const toggleDrop = (name: string) => setOpenDrop((prev) => prev === name ? null : name);
 
   if (error) {
-    return <Container><Header><HeaderLeft><PageTitle>Board</PageTitle></HeaderLeft></Header><CenterMsg $error>Failed to load board</CenterMsg></Container>;
+    return <Container><Header><HeaderLeft><TitleRow><PageTitle>Board</PageTitle></TitleRow></HeaderLeft></Header><CenterMsg $error>Failed to load board</CenterMsg></Container>;
   }
 
   return (
@@ -198,12 +309,83 @@ export default function BoardPage() {
       {/* ---- Header ---- */}
       <Header>
         <HeaderLeft>
-          <PageTitle>Board</PageTitle>
-          <ViewSwitcher>
-            <ViewBtn $active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')}>Kanban</ViewBtn>
-            <ViewBtn $active={viewMode === 'backlog'} onClick={() => setViewMode('backlog')}>Backlog</ViewBtn>
-            <ViewBtn $active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')}>Timeline</ViewBtn>
-          </ViewSwitcher>
+          <TitleRow>
+            {teamIdParam ? (
+              <>
+                <BackBtn onClick={() => navigate('/board')} title="Back to boards">
+                  <FiArrowLeft /> Boards
+                </BackBtn>
+                {(() => {
+                  const current = allTeams?.find((t) => t.id === teamIdParam);
+                  const region = allRegions?.find((r) => r.id === current?.region_id);
+                  if (!current) return <PageTitle>Loading…</PageTitle>;
+                  return (
+                    <div style={{ minWidth: 0 }}>
+                      <PageTitle>{current.name}</PageTitle>
+                      {(region || current.office) && (
+                        <BoardMetaLine>
+                          {region ? (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/board/region/${region.id}`);
+                              }}
+                              title="Open region board"
+                              style={{
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                textDecorationStyle: 'dotted',
+                                textUnderlineOffset: 2,
+                              }}
+                            >
+                              {region.code}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                          {current.office ? ` · ${current.office}` : ''}
+                        </BoardMetaLine>
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
+            ) : regionIdParam ? (
+              <>
+                <BackBtn onClick={() => navigate('/board')} title="Back to boards">
+                  <FiArrowLeft /> Boards
+                </BackBtn>
+                <div style={{ minWidth: 0 }}>
+                  <PageTitle>
+                    {currentRegion
+                      ? `${currentRegion.code} — ${currentRegion.name}`
+                      : 'Region'}
+                  </PageTitle>
+                  <BoardMetaLine>
+                    All boards in region · {boardsInRegion?.size || 0} boards
+                  </BoardMetaLine>
+                </div>
+              </>
+            ) : (
+              <PageTitle>My Tasks</PageTitle>
+            )}
+          </TitleRow>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ViewSwitcher>
+              <ViewBtn $active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')}>Kanban</ViewBtn>
+              <ViewBtn $active={viewMode === 'backlog'} onClick={() => setViewMode('backlog')}>Backlog</ViewBtn>
+              <ViewBtn $active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')}>Timeline</ViewBtn>
+              <ViewBtn $active={viewMode === 'archive'} onClick={() => setViewMode('archive')}>Archive</ViewBtn>
+            </ViewSwitcher>
+            {canOpenSettings && (
+              <SettingsBtn
+                onClick={() => setShowSettings(true)}
+                title={isCLevel || myBoardRole === 'team_lead' ? 'Board settings' : 'View board info'}
+              >
+                <FiSettings />
+              </SettingsBtn>
+            )}
+          </div>
         </HeaderLeft>
         {!isMobile && (
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -251,19 +433,60 @@ export default function BoardPage() {
           )}
         </ChipWrap>
 
-        {/* Team */}
+        {/* Board — on /board/:teamId, picks become navigation; on /my-tasks, it's a filter */}
         {allTeams && allTeams.length > 0 && (
           <ChipWrap data-dropdown>
             <Chip $active={!!filter.team_id} onClick={() => toggleDrop('team')}>
               {filter.team_id ? allTeams.find((t) => t.id === filter.team_id)?.name || 'Board' : 'Board'}
-              {filter.team_id ? <FiX onClick={(e) => { e.stopPropagation(); setFilter((f) => ({ ...f, team_id: undefined })); }} /> : <FiChevronDown />}
+              {filter.team_id ? (
+                <FiX
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (teamIdParam) {
+                      // On a specific board page — "clear" means leave this board
+                      navigate('/board');
+                    } else {
+                      setFilter((f) => ({ ...f, team_id: undefined }));
+                    }
+                  }}
+                />
+              ) : (
+                <FiChevronDown />
+              )}
             </Chip>
             {openDrop === 'team' && (
               <Dropdown>
-                {allTeams.map((t) => (
-                  <DropItem key={t.id} $active={filter.team_id === t.id}
-                    onClick={() => { setFilter((f) => ({ ...f, team_id: t.id })); setOpenDrop(null); }}>
-                    {t.name} {t.office && <span style={{ color: theme.colors.cadetGray, fontSize: '12px' }}>({t.office})</span>}
+                {(() => {
+                  // Scope the dropdown to the most meaningful set:
+                  // - region view: boards in that region
+                  // - specific board: sibling boards in THIS board's region (context stays sticky
+                  //   when you switch to another board from here)
+                  // - /my-tasks: all boards
+                  let list = allTeams;
+                  if (regionIdParam && boardsInRegion) {
+                    list = allTeams.filter((t) => boardsInRegion.has(t.id));
+                  } else if (teamIdParam && currentBoard?.region_id) {
+                    list = allTeams.filter((t) => t.region_id === currentBoard.region_id);
+                  }
+                  return list;
+                })().map((t) => (
+                  <DropItem
+                    key={t.id}
+                    $active={filter.team_id === t.id}
+                    onClick={() => {
+                      if (teamIdParam || regionIdParam) {
+                        // In locked mode, switch to that board by URL
+                        navigate(`/board/${t.id}`);
+                      } else {
+                        setFilter((f) => ({ ...f, team_id: t.id }));
+                      }
+                      setOpenDrop(null);
+                    }}
+                  >
+                    {t.name}{' '}
+                    {t.office && (
+                      <span style={{ color: theme.colors.cadetGray, fontSize: '12px' }}>({t.office})</span>
+                    )}
                   </DropItem>
                 ))}
               </Dropdown>
@@ -327,15 +550,27 @@ export default function BoardPage() {
       {isLoading || !board ? (
         <CenterMsg>Loading board...</CenterMsg>
       ) : viewMode === 'kanban' ? (
-        <KanbanBoard board={board} onStatusChange={handleStatusChange} onPositionChange={handlePositionChange} onQuickAdd={() => setShowCreateTask(true)} />
+        <KanbanBoard
+          board={board}
+          onStatusChange={handleStatusChange}
+          onPositionChange={handlePositionChange}
+          onQuickAdd={() => setShowCreateTask(true)}
+          resolveBoardLabel={
+            regionIdParam
+              ? (task) => allTeams?.find((t) => t.id === task.team_id)?.name
+              : undefined
+          }
+        />
       ) : viewMode === 'backlog' ? (
         <BacklogTable
-          stories={stories}
+          stories={scopedStories ?? stories}
           allTasks={board.columns.flatMap((c) => c.tasks)}
         />
+      ) : viewMode === 'archive' ? (
+        <ArchivedStoriesView />
       ) : (
         <TimelineView
-          stories={stories}
+          stories={scopedStories ?? stories}
           allTasks={board.columns.flatMap((c) => c.tasks)}
         />
       )}
@@ -374,6 +609,15 @@ export default function BoardPage() {
             });
           }}
           isLoading={createStory.isPending}
+        />
+      )}
+
+      {showSettings && currentBoard && (
+        <BoardSettings
+          board={currentBoard}
+          myRole={myBoardRole}
+          isCLevel={isCLevel}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </Container>

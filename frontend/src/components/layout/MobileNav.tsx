@@ -41,7 +41,7 @@ const NavTab = styled.button<{ $active: boolean }>`
 
 const tabs = [
   { path: '/my-tasks', icon: FiCheckSquare, label: 'Tasks' },
-  { path: '/board', icon: FiColumns, label: 'Board' },
+  { path: '/board', icon: FiColumns, label: 'Boards' },
   { path: '/more', icon: FiMoreHorizontal, label: 'More' },
 ];
 

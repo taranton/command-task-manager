@@ -83,9 +83,10 @@ interface KanbanBoardProps {
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onPositionChange: (taskId: string, sortOrder: number, columnStatus: TaskStatus, reorderedTasks: Task[]) => void;
   onQuickAdd?: (status: TaskStatus) => void;
+  resolveBoardLabel?: (task: Task) => string | undefined;
 }
 
-export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAdd }: KanbanBoardProps) {
+export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAdd, resolveBoardLabel }: KanbanBoardProps) {
   const isMobile = useIsMobile();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<TaskStatus>('in_progress');
@@ -180,23 +181,37 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAd
       return;
     }
 
-    // Same column: do arrayMove now (SortableContext only shows visual transforms)
+    // Same column: do arrayMove now (SortableContext only shows visual transforms).
+    // Note: onDragOver already moved the card across columns during the drag, so
+    // `activeContainer === overContainer` is true even for cross-column drops.
+    // We detect real status change by comparing the card's original task.status
+    // against the container it ended up in.
     if (activeContainer === overContainer) {
+      const statusChanged = task.status !== overContainer;
       const activeIndex = items[overContainer].indexOf(taskId);
       const overIndex = items[overContainer].indexOf(over.id as string);
+      const indexesDiffer = activeIndex !== overIndex && activeIndex !== -1 && overIndex !== -1;
 
-      if (activeIndex !== overIndex && activeIndex !== -1 && overIndex !== -1) {
-        const newOrder = arrayMove(items[overContainer], activeIndex, overIndex);
-        setItems((prev) => ({ ...prev, [overContainer]: newOrder }));
+      let finalOrder = items[overContainer];
+      if (indexesDiffer) {
+        finalOrder = arrayMove(items[overContainer], activeIndex, overIndex);
+        setItems((prev) => ({ ...prev, [overContainer]: finalOrder }));
+      }
 
+      if (indexesDiffer || statusChanged) {
         // Commit to server
-        const finalIdx = newOrder.indexOf(taskId);
-        const colTasks = newOrder.map((id) => taskLookup[id]).filter(Boolean) as Task[];
+        const finalIdx = finalOrder.indexOf(taskId);
+        const colTasks = finalOrder.map((id) => taskLookup[id]).filter(Boolean) as Task[];
         const beforeOrder = finalIdx > 0 ? colTasks[finalIdx - 1]?.sort_order : 0;
         const afterOrder = finalIdx < colTasks.length - 1 ? colTasks[finalIdx + 1]?.sort_order : beforeOrder + 2000;
         const newSortOrder = Math.floor((beforeOrder + afterOrder) / 2);
-        const reordered = colTasks.map((t) => t.id === taskId ? { ...t, sort_order: newSortOrder } : t);
+        const reordered = colTasks.map((t) =>
+          t.id === taskId ? { ...t, sort_order: newSortOrder, status: overContainer as TaskStatus } : t,
+        );
         onPositionChange(taskId, newSortOrder, overContainer as TaskStatus, reordered);
+        if (statusChanged) {
+          onStatusChange(taskId, overContainer as TaskStatus);
+        }
       }
     } else {
       // Cross column: place card at the END of the target column (simplest, no insert-between issues)
@@ -261,7 +276,7 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAd
         </StatusTabs>
         <MobileCardList>
           {tasks.length > 0 ? tasks.map((task) => (
-            <TaskCardComponent key={task.id} task={task} onClick={handleTaskClick} />
+            <TaskCardComponent key={task.id} task={task} onClick={handleTaskClick} boardLabel={resolveBoardLabel?.(task)} />
           )) : (
             <div style={{ textAlign: 'center', color: theme.colors.cadetGray, padding: '32px' }}>
               No tasks in {TASK_STATUS_LABELS[mobileTab]}
@@ -290,13 +305,13 @@ export function KanbanBoard({ board, onStatusChange, onPositionChange, onQuickAd
             const taskIds = items[status] || [];
             const tasks = taskIds.map((id) => taskLookup[id]).filter(Boolean) as Task[];
             return (
-              <KanbanColumn key={status} status={status} tasks={tasks} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} />
+              <KanbanColumn key={status} status={status} tasks={tasks} onTaskClick={handleTaskClick} onQuickAdd={onQuickAdd} resolveBoardLabel={resolveBoardLabel} />
             );
           })}
         </DesktopBoard>
 
         <DragOverlay dropAnimation={null}>
-          {activeTask ? <TaskCardComponent task={activeTask} onClick={() => {}} isOverlay /> : null}
+          {activeTask ? <TaskCardComponent task={activeTask} onClick={() => {}} isOverlay boardLabel={resolveBoardLabel?.(activeTask)} /> : null}
         </DragOverlay>
       </DndContext>
 

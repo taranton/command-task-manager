@@ -11,10 +11,11 @@ import (
 )
 
 type TaskService struct {
-	taskRepo    *repository.TaskRepository
-	subtaskRepo *repository.SubtaskRepository
-	storyRepo   *repository.StoryRepository
-	changelog   *ChangeLogger
+	taskRepo     *repository.TaskRepository
+	subtaskRepo  *repository.SubtaskRepository
+	storyRepo    *repository.StoryRepository
+	entitiesRepo *repository.EntitiesRepository // optional; used to auto-resolve deps/blockers
+	changelog    *ChangeLogger
 }
 
 func NewTaskService(taskRepo *repository.TaskRepository, subtaskRepo *repository.SubtaskRepository, storyRepo *repository.StoryRepository, changelog *ChangeLogger) *TaskService {
@@ -24,6 +25,13 @@ func NewTaskService(taskRepo *repository.TaskRepository, subtaskRepo *repository
 		storyRepo:   storyRepo,
 		changelog:   changelog,
 	}
+}
+
+// WithEntitiesRepo attaches the entities repo so status transitions can auto-resolve
+// any story-deps or external blockers that reference the task.
+func (s *TaskService) WithEntitiesRepo(er *repository.EntitiesRepository) *TaskService {
+	s.entitiesRepo = er
+	return s
 }
 
 // ============================================================
@@ -266,6 +274,16 @@ func (s *TaskService) UpdateTaskStatus(ctx context.Context, id uuid.UUID, status
 	// Log status change
 	if s.changelog != nil && oldStatus != status {
 		s.changelog.LogStatusChange(ctx, "task", id, oldStatus, status, task.CreatedBy)
+	}
+
+	// Auto-resolve any story-deps or external blockers tied to this task once it's done.
+	if s.entitiesRepo != nil && status == model.TaskStatusDone && oldStatus != model.TaskStatusDone {
+		if _, err := s.entitiesRepo.AutoResolveDepsForTask(ctx, id); err != nil {
+			// Non-fatal — log and continue
+		}
+		if _, err := s.entitiesRepo.AutoResolveBlockersForTask(ctx, id); err != nil {
+			// Non-fatal
+		}
 	}
 
 	return s.cascadeFromTask(ctx, task.StoryID)

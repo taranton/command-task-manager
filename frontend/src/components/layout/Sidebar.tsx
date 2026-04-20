@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FiCheckSquare, FiColumns, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiCheckSquare, FiColumns, FiSettings, FiLogOut, FiBarChart2, FiCalendar } from 'react-icons/fi';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -78,6 +78,17 @@ const Separator = styled.div`
   margin: ${theme.spacing.sm} ${theme.spacing.md};
 `;
 
+const SectionLabel = styled.div<{ $collapsed: boolean }>`
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: ${(p) => (p.$collapsed ? 0 : 1)};
+  transition: opacity 0.2s ease;
+`;
+
 const BottomSection = styled.div`
   padding: ${theme.spacing.sm} 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -85,7 +96,7 @@ const BottomSection = styled.div`
 
 const navItems = [
   { path: '/my-tasks', icon: FiCheckSquare, label: 'My Tasks' },
-  { path: '/board', icon: FiColumns, label: 'Board' },
+  { path: '/board', icon: FiColumns, label: 'Boards' },
 ];
 
 interface SidebarProps {
@@ -97,7 +108,8 @@ export function Sidebar({ collapsed }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const showAdmin = user?.role === 'clevel' || user?.role === 'team_lead';
+  const isCLevel = user?.role === 'clevel';
+  const showAdmin = isCLevel || user?.role === 'team_lead';
   const { logout } = useAuth();
 
   return (
@@ -117,13 +129,34 @@ export function Sidebar({ collapsed }: SidebarProps) {
         {showAdmin && (
           <>
             <Separator />
+            <SectionLabel $collapsed={collapsed}>Executive</SectionLabel>
+            {isCLevel && (
+              <NavItem
+                $active={location.pathname === '/c-level'}
+                $collapsed={collapsed}
+                onClick={() => navigate('/c-level')}
+              >
+                <FiBarChart2 />
+                <span>C-Level Board</span>
+              </NavItem>
+            )}
+            {isCLevel && (
+              <NavItem
+                $active={location.pathname === '/executive'}
+                $collapsed={collapsed}
+                onClick={() => navigate('/executive')}
+              >
+                <FiCalendar />
+                <span>Releases & Events</span>
+              </NavItem>
+            )}
             <NavItem
               $active={location.pathname === '/admin'}
               $collapsed={collapsed}
               onClick={() => navigate('/admin')}
             >
               <FiSettings />
-              <span>Boards</span>
+              <span>Organization</span>
             </NavItem>
           </>
         )}

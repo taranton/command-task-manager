@@ -157,6 +157,7 @@ func (h *AdminHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 		Description *string `json:"description"`
 		Office      *string `json:"office"`
 		LeadID      *string `json:"lead_id"`
+		RegionID    *string `json:"region_id"`
 	}
 	if err := decodeJSON(r, &input); err != nil || input.Name == "" {
 		respondError(w, http.StatusBadRequest, "name is required")
@@ -165,10 +166,10 @@ func (h *AdminHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO teams (name, description, office, lead_id)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO teams (name, description, office, lead_id, region_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
-	`, input.Name, input.Description, input.Office, input.LeadID).Scan(&id)
+	`, input.Name, input.Description, input.Office, input.LeadID, input.RegionID).Scan(&id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to create team")
 		return
@@ -201,6 +202,7 @@ func (h *AdminHandler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		Description *string `json:"description"`
 		Office      *string `json:"office"`
 		LeadID      *string `json:"lead_id"`
+		RegionID    *string `json:"region_id"`
 	}
 	if err := decodeJSON(r, &input); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -218,6 +220,13 @@ func (h *AdminHandler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	if input.LeadID != nil && currentRole == model.RoleCLevel {
 		h.db.Exec(r.Context(), "UPDATE teams SET lead_id = $1, updated_at = NOW() WHERE id = $2", *input.LeadID, teamID)
+	}
+	if input.RegionID != nil && currentRole == model.RoleCLevel {
+		if *input.RegionID == "" {
+			h.db.Exec(r.Context(), "UPDATE teams SET region_id = NULL, updated_at = NOW() WHERE id = $1", teamID)
+		} else {
+			h.db.Exec(r.Context(), "UPDATE teams SET region_id = $1, updated_at = NOW() WHERE id = $2", *input.RegionID, teamID)
+		}
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{"id": teamID, "updated": true})

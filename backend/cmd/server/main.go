@@ -13,6 +13,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/qrt/command/internal/config"
 	"github.com/qrt/command/internal/handler"
@@ -42,12 +44,15 @@ func main() {
 	storyRepo := repository.NewStoryRepository(db)
 	taskRepo := repository.NewTaskRepository(db)
 	subtaskRepo := repository.NewSubtaskRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
+	entitiesRepo := repository.NewEntitiesRepository(db)
 
 	// Services
 	changelog := service.NewChangeLogger(db)
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, rdb)
 	storyService := service.NewStoryService(storyRepo)
-	taskService := service.NewTaskService(taskRepo, subtaskRepo, storyRepo, changelog)
+	taskService := service.NewTaskService(taskRepo, subtaskRepo, storyRepo, changelog).WithEntitiesRepo(entitiesRepo)
+	analyticsService := service.NewAnalyticsService(analyticsRepo)
 
 	// WebSocket hub
 	hub := ws.NewHub(rdb)
@@ -58,13 +63,16 @@ func main() {
 	userHandler := handler.NewUserHandler(userRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	adminHandler := handler.NewAdminHandler(db, userRepo)
-	storyHandler := handler.NewStoryHandler(storyService)
+	storyHandler := handler.NewStoryHandler(storyService, hub)
 	taskHandler := handler.NewTaskHandler(taskService, hub)
 	subtaskHandler := handler.NewSubtaskHandler(taskService, hub)
 	regionHandler := handler.NewRegionHandler(db)
 	commentRepo := repository.NewCommentRepository(db)
 	commentHandler := handler.NewCommentHandler(commentRepo)
 	boardHandler := handler.NewBoardHandler(taskService, storyService, db)
+	boardsOverviewHandler := handler.NewBoardsOverviewHandler(db)
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
+	entitiesHandler := handler.NewEntitiesHandler(entitiesRepo)
 	wsHandler := handler.NewWSHandler(hub, authService)
 
 	// Router
@@ -108,11 +116,16 @@ func main() {
 		r.Get("/api/v1/teams", teamHandler.List)
 		r.Get("/api/v1/teams/{id}", teamHandler.Get)
 		r.Post("/api/v1/teams", adminHandler.CreateTeam)
-		r.Put("/api/v1/teams/{id}", adminHandler.UpdateTeam)
+		r.Patch("/api/v1/teams/{id}", adminHandler.UpdateTeam)
 		r.Get("/api/v1/teams/{id}/members", adminHandler.GetTeamMembers)
 
 		// Regions
 		r.Get("/api/v1/regions", regionHandler.List)
+		r.Post("/api/v1/regions", regionHandler.Create)
+		r.Patch("/api/v1/regions/{id}", regionHandler.Update)
+		r.Delete("/api/v1/regions/{id}", regionHandler.Delete)
+		r.Get("/api/v1/region-archives", regionHandler.ListArchives)
+		r.Get("/api/v1/region-archives/{id}", regionHandler.GetArchive)
 		r.Patch("/api/v1/users/{id}/region", regionHandler.AssignUserRegion)
 		r.Patch("/api/v1/teams/{id}/region", regionHandler.AssignBoardRegion)
 
@@ -132,6 +145,9 @@ func main() {
 		r.Get("/api/v1/stories/{id}", storyHandler.Get)
 		r.Patch("/api/v1/stories/{id}", storyHandler.Update)
 		r.Delete("/api/v1/stories/{id}", storyHandler.Delete)
+		r.Post("/api/v1/stories/{id}/archive", storyHandler.Archive)
+		r.Post("/api/v1/stories/{id}/unarchive", storyHandler.Unarchive)
+		r.Get("/api/v1/stories/timeline-start", storyHandler.TimelineStart)
 
 		// Tasks
 		r.Get("/api/v1/stories/{storyId}/tasks", taskHandler.ListByStory)
@@ -204,6 +220,37 @@ func main() {
 
 		// Board
 		r.Get("/api/v1/board", boardHandler.GetBoard)
+		r.Get("/api/v1/boards/overview", boardsOverviewHandler.List)
+
+		// Analytics (C-Level Board)
+		r.Get("/api/v1/analytics/kpi", analyticsHandler.KPI)
+		r.Get("/api/v1/analytics/burndown", analyticsHandler.Burndown)
+		r.Get("/api/v1/analytics/offices", analyticsHandler.Offices)
+		r.Get("/api/v1/analytics/period-compare", analyticsHandler.PeriodCompare)
+		r.Get("/api/v1/analytics/risks", analyticsHandler.Risks)
+		r.Get("/api/v1/analytics/people-risk", analyticsHandler.PeopleRisk)
+		r.Get("/api/v1/analytics/drill", analyticsHandler.Drill)
+
+		// Releases
+		r.Get("/api/v1/releases", entitiesHandler.ListReleases)
+		r.Post("/api/v1/releases", entitiesHandler.CreateRelease)
+		r.Delete("/api/v1/releases/{id}", entitiesHandler.DeleteRelease)
+
+		// Story dependencies
+		r.Get("/api/v1/story-deps", entitiesHandler.ListDeps)
+		r.Post("/api/v1/story-deps", entitiesHandler.CreateDep)
+		r.Delete("/api/v1/story-deps/{id}", entitiesHandler.DeleteDep)
+
+		// External blockers
+		r.Get("/api/v1/blockers", entitiesHandler.ListBlockers)
+		r.Post("/api/v1/blockers", entitiesHandler.CreateBlocker)
+		r.Post("/api/v1/blockers/{id}/resolve", entitiesHandler.ResolveBlocker)
+		r.Delete("/api/v1/blockers/{id}", entitiesHandler.DeleteBlocker)
+
+		// Timeline events
+		r.Get("/api/v1/events", entitiesHandler.ListEvents)
+		r.Post("/api/v1/events", entitiesHandler.CreateEvent)
+		r.Delete("/api/v1/events/{id}", entitiesHandler.DeleteEvent)
 	})
 
 	// Health check
@@ -211,6 +258,18 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Analytics snapshot scheduler (after routes, before server start so ctx lives)
+	snapshotCtx, snapshotCancel := context.WithCancel(context.Background())
+	defer snapshotCancel()
+	go func() {
+		regionIDs, err := loadRegionIDs(snapshotCtx, db)
+		if err != nil {
+			log.Printf("analytics: failed to load regions: %v", err)
+			return
+		}
+		analyticsService.StartSnapshotScheduler(snapshotCtx, regionIDs)
+	}()
 
 	// Server
 	srv := &http.Server{
@@ -241,4 +300,21 @@ func main() {
 		log.Fatalf("server shutdown failed: %v", err)
 	}
 	log.Println("server stopped")
+}
+
+func loadRegionIDs(ctx context.Context, db *pgxpool.Pool) ([]uuid.UUID, error) {
+	rows, err := db.Query(ctx, `SELECT id FROM regions WHERE is_active = true`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }

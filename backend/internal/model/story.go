@@ -64,6 +64,7 @@ type Story struct {
 	CreatedAt    time.Time   `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at" db:"updated_at"`
 	DeletedAt    *time.Time  `json:"deleted_at,omitempty" db:"deleted_at"`
+	ArchivedAt   *time.Time  `json:"archived_at,omitempty" db:"archived_at"`
 
 	// Joined fields
 	Tasks              []Task `json:"tasks,omitempty"`
@@ -95,13 +96,14 @@ type UpdateStoryInput struct {
 }
 
 type StoryFilter struct {
-	Status    *StoryStatus `json:"status,omitempty"`
-	Priority  *Priority    `json:"priority,omitempty"`
-	ProjectID *string      `json:"project_id,omitempty"`
-	TeamID    *uuid.UUID   `json:"team_id,omitempty"`
-	RegionID  *uuid.UUID   `json:"region_id,omitempty"`
-	Limit     int          `json:"limit"`
-	Offset    int          `json:"offset"`
+	Status       *StoryStatus `json:"status,omitempty"`
+	Priority     *Priority    `json:"priority,omitempty"`
+	ProjectID    *string      `json:"project_id,omitempty"`
+	TeamID       *uuid.UUID   `json:"team_id,omitempty"`
+	RegionID     *uuid.UUID   `json:"region_id,omitempty"`
+	Limit        int          `json:"limit"`
+	Offset       int          `json:"offset"`
+	ArchivedOnly bool         `json:"archived_only,omitempty"` // true → only archived; false → only non-archived (default)
 }
 
 // ---- Cascade Result ----

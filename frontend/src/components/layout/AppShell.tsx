@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
@@ -36,7 +37,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('app:sidebarCollapsed', false);
 
   return (
     <Layout>

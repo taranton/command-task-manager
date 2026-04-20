@@ -14,21 +14,30 @@ export function useWebSocket() {
       const msg = JSON.parse(event.data);
       const type = msg.type as string;
 
+      const affectsAnalytics =
+        type.startsWith('task.') || type.startsWith('subtask.') || type === 'story.updated' || type === 'story.created' || type === 'story.deleted';
+
       if (type.startsWith('task.') || type.startsWith('subtask.')) {
         qc.invalidateQueries({ queryKey: ['board'] });
         qc.invalidateQueries({ queryKey: ['stories'] });
-        // Invalidate specific task if open
         if (msg.payload?.id) {
           qc.invalidateQueries({ queryKey: ['task', msg.payload.id] });
         }
       }
 
-      if (type === 'story.updated') {
+      if (type.startsWith('story.')) {
         qc.invalidateQueries({ queryKey: ['stories'] });
         qc.invalidateQueries({ queryKey: ['board'] });
         if (msg.payload?.id) {
           qc.invalidateQueries({ queryKey: ['story', msg.payload.id] });
         }
+      }
+
+      // C-Level Board analytics — invalidate on any task/story/subtask change.
+      // Widgets (KPI hero, burndown, offices, risks, people-risk, period-compare,
+      // drill-down) all live under ['analytics', ...] keys and will auto-refetch.
+      if (affectsAnalytics) {
+        qc.invalidateQueries({ queryKey: ['analytics'] });
       }
     } catch {
       // ignore parse errors

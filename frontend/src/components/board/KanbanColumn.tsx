@@ -101,9 +101,10 @@ interface KanbanColumnProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onQuickAdd?: (status: TaskStatus) => void;
+  resolveBoardLabel?: (task: Task) => string | undefined;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd, resolveBoardLabel }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const color = theme.colors.status[status] || theme.colors.cadetGray;
 
@@ -122,7 +123,12 @@ export function KanbanColumn({ status, tasks, onTaskClick, onQuickAdd }: KanbanC
         <CardList>
           {tasks.length > 0 ? (
             tasks.map((task) => (
-              <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} />
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                onClick={onTaskClick}
+                boardLabel={resolveBoardLabel?.(task)}
+              />
             ))
           ) : (
             <EmptyState>No tasks</EmptyState>
